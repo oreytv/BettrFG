@@ -1,6 +1,6 @@
-﻿![BetterFG Logo](./assets/betterfglogo.png)
+﻿![BettrFG Logo](./assets/betterfglogo.png)
 
-# BetterFG Releases
+# BettrFG Releases
 
 This repo holds the installer for BettrFG, the Fall Guys mod
 
