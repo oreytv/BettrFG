@@ -1,4 +1,4 @@
-﻿![BetterFG Logo](../assets/betterfglogo.png)
+﻿![BetterFG Logo](./assets/betterfglogo.png)
 
 # BetterFG Releases
 
