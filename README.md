@@ -12,7 +12,7 @@ Programming, most implementations:
 Audio:
 - Persona 5 UI sfx
 
-![screenshot 1](./assets/screenshot001.png)
+![screenshot 1](./assets/screenshot001.jpg)
 
 # Controls
 Press Shift Z to toggle tabs
