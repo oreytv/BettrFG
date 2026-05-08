@@ -4,6 +4,8 @@
 
 This repo holds the installer for BettrFG, the Fall Guys mod that aims to make the Fall Guys experience more fun using custom QoL features and UGC customization
 
+### Di sc 0rd server:
+http://dsc.gg/bettrfg
 
 # Features
 - Custom UGC skins and accessories
@@ -14,7 +16,7 @@ This repo holds the installer for BettrFG, the Fall Guys mod that aims to make t
 - Custom discovery map played counter
 
 # Skin creation
-- Guide TBD
+- Proper guide TBD but you can refer to this as of now https://www.youtube.com/watch?v=mH6U-pOgtco
 
 # Contribution
 
