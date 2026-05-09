@@ -17,6 +17,7 @@ http://dsc.gg/bettrfg
 
 # Skin creation
 - Proper guide TBD but you can refer to this as of now https://www.youtube.com/watch?v=mH6U-pOgtco
+- [Download base rig.blend](https://github.com/oreytv/BettrFG/raw/refs/heads/main/assets/base%20rig.blend)
 
 # Contribution
 
