@@ -1,11 +1,18 @@
-﻿![BettrFG Logo](./assets/betterfglogo.png)
+ 
+ ![BettrFG Logo](./assets/betterfglogo.png)
+
+ <p align="center">
+  <a href="https://github.com/oreytv/BettrFG/releases/tag/installer"><img src="https://img.shields.io/badge/installer-download-32c955" /></a>
+  <a href="https://github.com/oreytv/BettrFG/releases/latest"><img src="https://img.shields.io/github/v/release/oreytv/BettrFG?label=release" /></a>
+  <img src="https://img.shields.io/github/downloads/oreytv/BettrFG/total?label=downloads" />
+  <img src="https://img.shields.io/github/last-commit/oreytv/BettrFG?label=last%20commit" />
+</p>
+
 
 # BettrFG Releases
 
 This repo holds the installer for BettrFG, the Fall Guys mod that aims to make the Fall Guys experience more fun using custom QoL features and UGC customization
 Download the installer from the official GitHub release:
-
-[Download BettrFG Installer](https://github.com/oreytv/BettrFG/releases/tag/installer)
 
 ### Discord server:
 http://dsc.gg/bettrfg
