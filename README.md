@@ -12,7 +12,6 @@
 # BettrFG Releases
 
 This repo holds the installer for BettrFG, the Fall Guys mod that aims to make the Fall Guys experience more fun using custom QoL features and UGC customization
-Download the installer from the official GitHub release:
 
 ### Discord server:
 http://dsc.gg/bettrfg
