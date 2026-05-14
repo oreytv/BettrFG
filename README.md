@@ -33,6 +33,10 @@ http://dsc.gg/bettrfg
 Programming, most implementations:
 - oreytv (oreyre)
 
+Programming help & code snippets:
+- [Floyzi](https://x.com/floyzi102)
+
+  
 UI:
 - oreytv (oreyre)
 
