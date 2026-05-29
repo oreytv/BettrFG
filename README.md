@@ -33,7 +33,7 @@ http://dsc.gg/bettrfg
 Programming, most implementations:
 - oreytv (oreyre)
 
-Programming help & code snippets:
+Programming help, code snippets, general ideas and features:
 - [Floyzi](https://x.com/floyzi102)
 
   
