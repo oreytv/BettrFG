@@ -25,8 +25,9 @@ http://dsc.gg/bettrfg
 - Custom discovery map played counter
 
 # Skin creation
-- Proper guide TBD but you can refer to this as of now https://www.youtube.com/watch?v=mH6U-pOgtco
+- https://youtu.be/QwjHGslCnnM guide
 - [Download base rig.blend](https://github.com/oreytv/BettrFG/raw/refs/heads/main/assets/base%20rig.blend)
+- Unity https://unity.com/releases/editor/whats-new/2021.3.16f1
 
 # Contribution
 
