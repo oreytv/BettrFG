@@ -43,7 +43,7 @@ UI:
 Audio:
 - Persona 5 UI sfx
 
-##### This is really worth noting: AI was heavily used throughout most of the process of creating this mod
+##### This is really worth noting: AI was heavily used throughout most of the process of coding this mod
 
 ![screenshot 1](./assets/screenshot001.jpg)
 
