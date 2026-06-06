@@ -22,7 +22,8 @@ http://dsc.gg/bettrfg
 - Custom phrases and image emoticons
 - Game appearance customization (menu, lobby)
 - Personal Best saving and listing
-- Custom discovery map played counter
+- In-game time/points leaderboard
+- and more
 
 # Skin creation
 - https://youtu.be/QwjHGslCnnM guide
@@ -44,7 +45,7 @@ UI:
 Audio:
 - Persona 5 UI sfx
 
-##### This is really worth noting: AI was heavily used throughout most of the process of coding this mod
+### This is really worth noting: AI was heavily used throughout most of the process of coding this mod, I take blame for any bugs
 
 ![screenshot 1](./assets/screenshot001.jpg)
 
