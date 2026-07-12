@@ -1,0 +1,10 @@
+<Project>
+  <PropertyGroup>
+    <BettrFGVersion>1.2.2</BettrFGVersion>
+    <BettrFGDisplayName>BettrFG</BettrFGDisplayName>
+    <BettrFGInstallerName>BettrFG Installer</BettrFGInstallerName>
+    <BettrFGRepoOwner>oreytv</BettrFGRepoOwner>
+    <BettrFGRepoName>BettrFG</BettrFGRepoName>
+    <BettrFGPayloadAssetName>BepInEx.zip</BettrFGPayloadAssetName>
+  </PropertyGroup>
+</Project>

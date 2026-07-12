@@ -1,0 +1,1453 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<!-- Build hash = SHA256 of all .cs source files in the project, truncated to 16 hex chars.
+	     Deterministic: same source tree → same hash on any machine. Source change → new hash.
+	     Lands in obj\...\BuildHash.g.cs as a partial of BetterFGInfo. -->
+	<PropertyGroup>
+	  <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
+	  <BuildHashFile>$(IntermediateOutputPath)BuildHash.g.cs</BuildHashFile>
+	</PropertyGroup>
+	<UsingTask TaskName="ComputeBettrFGSourceHash" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+	  <ParameterGroup>
+	    <ProjectDir ParameterType="System.String" Required="true" />
+	    <HashValue ParameterType="System.String" Output="true" />
+	  </ParameterGroup>
+	  <Task>
+	    <Using Namespace="System" />
+	    <Using Namespace="System.IO" />
+	    <Using Namespace="System.Linq" />
+	    <Using Namespace="System.Security.Cryptography" />
+	    <Code Type="Fragment" Language="cs"><![CDATA[
+	      var files = Directory.GetFiles(ProjectDir, "*.cs", SearchOption.AllDirectories)
+	                           .Where(f => f.IndexOf("\\obj\\", StringComparison.OrdinalIgnoreCase) < 0
+	                                    && f.IndexOf("\\bin\\", StringComparison.OrdinalIgnoreCase) < 0)
+	                           .OrderBy(f => f, StringComparer.Ordinal)
+	                           .ToArray();
+	      using (var sha = SHA256.Create())
+	      {
+	        foreach (var f in files)
+	        {
+	          var rel = System.Text.Encoding.UTF8.GetBytes(f.Substring(ProjectDir.Length).Replace('\\','/') + "\n");
+	          sha.TransformBlock(rel, 0, rel.Length, null, 0);
+	          var bytes = File.ReadAllBytes(f);
+	          sha.TransformBlock(bytes, 0, bytes.Length, null, 0);
+	        }
+	        sha.TransformFinalBlock(new byte[0], 0, 0);
+	        HashValue = BitConverter.ToString(sha.Hash).Replace("-", "").ToLowerInvariant().Substring(0, 16);
+	      }
+	    ]]></Code>
+	  </Task>
+	</UsingTask>
+	<Target Name="GenerateBuildHash" BeforeTargets="BeforeCompile;CoreCompile">
+	  <ComputeBettrFGSourceHash ProjectDir="$(MSBuildProjectDirectory)\">
+	    <Output TaskParameter="HashValue" PropertyName="BuildHashValue" />
+	  </ComputeBettrFGSourceHash>
+	  <ItemGroup>
+	    <_BuildHashContent Include="namespace BetterFG.Core { public static partial class BetterFGInfo { public const string BuildHash = &quot;$(BuildHashValue)&quot;%3B } }" />
+	  </ItemGroup>
+	  <WriteLinesToFile File="$(BuildHashFile)" Lines="@(_BuildHashContent)" Overwrite="true" WriteOnlyWhenDifferent="false" />
+	  <ItemGroup>
+	    <Compile Include="$(BuildHashFile)" />
+	  </ItemGroup>
+	</Target>
+
+	<!-- Fall Guys locks BetterFG.dll while running, which makes CopyDll fail with retries. Hard-kill the
+	     game before we compile so the plugin file is free. Best-effort: taskkill returns non-zero if the
+	     process isn't running, so ignore the exit code. -->
+	<Target Name="KillFallGuysBeforeBuild" BeforeTargets="BeforeBuild" Condition="'$(SkipCopyDll)' != 'true'">
+	  <Exec Command="taskkill /F /IM FallGuys_client_game.exe /T" ContinueOnError="true" />
+	  <Exec Command="taskkill /F /IM FallGuys_client.exe /T" ContinueOnError="true" />
+	</Target>
+
+	<Target Name="CopyNAudio" AfterTargets="Build">
+	  <Copy SourceFiles="$(NuGetPackageRoot)naudio.core\2.3.0\lib\netstandard2.0\NAudio.Core.dll" DestinationFolder="$(OutDir)" />
+	  <Copy SourceFiles="$(NuGetPackageRoot)naudio.winmm\2.3.0\lib\netstandard2.0\NAudio.WinMM.dll" DestinationFolder="$(OutDir)" />
+	  <Copy SourceFiles="$(NuGetPackageRoot)naudio\2.3.0\lib\net6.0\NAudio.dll" DestinationFolder="$(OutDir)" />
+	</Target>
+
+	<Target Name="PackBetterFGPayload" AfterTargets="CopyDll">
+	  <Exec Command="powershell -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\BetterFG.Installer\repack_payload.ps1&quot; -BuildOutput &quot;$(TargetDir)&quot;" />
+	</Target>
+
+	<Target Name="PublishBetterFGInstaller" AfterTargets="PackBetterFGPayload">
+	  <Exec Command="powershell -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\BetterFG.Installer\publish_installer.ps1&quot;" />
+	</Target>
+
+	<Target Name="PublishSkinPackager" AfterTargets="PublishBetterFGInstaller">
+	  <PropertyGroup>
+	    <SkinPackagerConfiguration>Release</SkinPackagerConfiguration>
+	    <SkinPackagerConfiguration Condition="'$(Configuration)' == 'Debug' Or '$(Configuration)' == 'Release' Or '$(Configuration)' == 'EarlyAcesss' Or '$(Configuration)' == 'EarlyAccess_xb1'">$(Configuration)</SkinPackagerConfiguration>
+	    <SkinPackagerProject>$(MSBuildProjectDirectory)\..\BetterFG.SkinPackager\BetterFG.Creator.csproj</SkinPackagerProject>
+	    <SkinPackagerOutput>$(MSBuildProjectDirectory)\..\BetterFG.SkinPackager\bin\$(SkinPackagerConfiguration)\BetterFG.Creator.dll</SkinPackagerOutput>
+	    <SkinPackagerGroupBat>$(MSBuildProjectDirectory)\..\BetterFG.SkinPackager\group_skins.bat</SkinPackagerGroupBat>
+	    <DownloadsDir>$(USERPROFILE)\Downloads</DownloadsDir>
+	  </PropertyGroup>
+	  <MSBuild Projects="$(SkinPackagerProject)" Targets="Build" Properties="Configuration=$(SkinPackagerConfiguration);Platform=AnyCPU" />
+	  <MakeDir Directories="$(DownloadsDir)" Condition="'$(DownloadsDir)' != '' And !Exists('$(DownloadsDir)')" />
+	  <Copy SourceFiles="$(SkinPackagerOutput)" DestinationFolder="$(DownloadsDir)" OverwriteReadOnlyFiles="true" Condition="Exists('$(SkinPackagerOutput)')" />
+	  <Copy SourceFiles="$(SkinPackagerGroupBat)" DestinationFolder="$(DownloadsDir)" OverwriteReadOnlyFiles="true" Condition="Exists('$(SkinPackagerGroupBat)')" />
+	</Target>
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <AssemblyName>BetterFG</AssemblyName>
+    <Product>$(BettrFGDisplayName)</Product>
+    <Version>$(BettrFGVersion)</Version>
+    <AssemblyVersion>$(BettrFGVersion)</AssemblyVersion>
+    <FileVersion>$(BettrFGVersion)</FileVersion>
+    <InformationalVersion>$(BettrFGVersion)</InformationalVersion>
+    <AssemblyTitle>$(BettrFGDisplayName)</AssemblyTitle>
+    <BepInExPluginName>$(BettrFGDisplayName)</BepInExPluginName>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <LangVersion>latest</LangVersion>
+    <RestoreAdditionalProjectSources>
+      https://api.nuget.org/v3/index.json;
+      https://nuget.bepinex.dev/v3/index.json;
+      https://nuget.samboy.dev/v3/index.json
+    </RestoreAdditionalProjectSources>
+    <RootNamespace>BetterFG</RootNamespace>
+    <Configurations>Debug;Release;Release_Profiles;XB1;EarlyAcesss;EarlyAccess_xb1</Configurations>
+  </PropertyGroup>
+
+  <!-- Profiles is a config-gated feature. Epic doesn't like it shipping in normal Release, so it's
+       only compiled in when PROFILES is defined: Debug (so dev builds keep it) + Release_Profiles.
+       Plain Release (and the console variants) leave it out entirely - source files are excluded
+       from compilation below and every call site is wrapped in #if PROFILES. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug' Or '$(Configuration)' == 'Release_Profiles'">
+    <DefineConstants>$(DefineConstants);PROFILES</DefineConstants>
+  </PropertyGroup>
+
+  <!-- when PROFILES isn't defined, don't even compile the feature's source files -->
+  <ItemGroup Condition="!$(DefineConstants.Contains('PROFILES'))">
+    <Compile Remove="Customization\Profiles\ProfileService.cs" />
+    <Compile Remove="Customization\Profiles\LobbyProfileService.cs" />
+    <Compile Remove="UI\Windows\ProfilesWindow.cs" />
+  </ItemGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'EarlyAcesss'">
+    <DefineConstants>$(DefineConstants);EARLYACESSS</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'EarlyAccess_xb1'">
+    <DefineConstants>$(DefineConstants);EARLYACCESS_XB1</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'XB1'">
+    <DefineConstants>$(DefineConstants);XB1</DefineConstants>
+  </PropertyGroup>
+
+<Target Name="CopyDll" AfterTargets="CopyNAudio" Condition="'$(SkipCopyDll)' != 'true'">
+  <MakeDir Directories="C:\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\plugins\BetterFG" />
+  <Copy SourceFiles="$(TargetPath)" DestinationFolder="C:\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\plugins\BetterFG" OverwriteReadOnlyFiles="true" />
+  <!-- launch here, as the last step of the copy, so it fires the instant the fresh plugin lands — not after
+       the payload repack / installer / skinpackager chain (those are separate AfterTargets and drain later). -->
+  <Exec Command="cmd /c start &quot;&quot; steam://rungameid/1097150" ContinueOnError="true" Condition="'$(SkipLaunch)' != 'true'" />
+</Target>
+
+  <ItemGroup>
+    <None Remove="assets\audio\apply.wav" />
+    <None Remove="assets\audio\buttonclick.wav" />
+    <None Remove="assets\audio\buttonhoveron.wav" />
+    <None Remove="assets\audio\click.wav" />
+    <None Remove="assets\audio\hideui.wav" />
+    <None Remove="assets\audio\pb.wav" />
+    <None Remove="assets\audio\poof003.wav" />
+    <None Remove="assets\audio\showui.wav" />
+    <None Remove="assets\audio\slotdropdown.wav" />
+    <None Remove="assets\audio\starsup.wav" />
+    <None Remove="assets\audio\tabclose.wav" />
+    <None Remove="assets\audio\tabopen.wav" />
+    <None Remove="assets\audio\tipshow.wav" />
+    <None Remove="assets\bundles\betterfg_menubg" />
+    <None Remove="assets\bundles\betterfg_startup" />
+    <None Remove="assets\bundles\bettrfg_backdropgradient" />
+    <None Remove="assets\bundles\bettrfg_ui_shader" />
+    <None Remove="assets\bundles\bettrfg_ui_warp" />
+    <None Remove="assets\bundles\material_invisible" />
+    <None Remove="assets\bundles\bettrfg_mat_ghost" />
+    <None Remove="assets\bundles\vfx_poof" />
+    <None Remove="assets\bundles\bettrfg_anim_eyes" />
+    <None Remove="assets\flags\AD.png" />
+    <None Remove="assets\flags\AE.png" />
+    <None Remove="assets\flags\AF.png" />
+    <None Remove="assets\flags\AG.png" />
+    <None Remove="assets\flags\AI.png" />
+    <None Remove="assets\flags\AL.png" />
+    <None Remove="assets\flags\AM.png" />
+    <None Remove="assets\flags\AN.png" />
+    <None Remove="assets\flags\AO.png" />
+    <None Remove="assets\flags\AQ.png" />
+    <None Remove="assets\flags\AR.png" />
+    <None Remove="assets\flags\AS.png" />
+    <None Remove="assets\flags\AT.png" />
+    <None Remove="assets\flags\AU.png" />
+    <None Remove="assets\flags\AW.png" />
+    <None Remove="assets\flags\AX.png" />
+    <None Remove="assets\flags\AZ.png" />
+    <None Remove="assets\flags\BA.png" />
+    <None Remove="assets\flags\BB.png" />
+    <None Remove="assets\flags\BD.png" />
+    <None Remove="assets\flags\BE.png" />
+    <None Remove="assets\flags\BF.png" />
+    <None Remove="assets\flags\BG.png" />
+    <None Remove="assets\flags\BH.png" />
+    <None Remove="assets\flags\BI.png" />
+    <None Remove="assets\flags\BJ.png" />
+    <None Remove="assets\flags\BL.png" />
+    <None Remove="assets\flags\BM.png" />
+    <None Remove="assets\flags\BN.png" />
+    <None Remove="assets\flags\BO.png" />
+    <None Remove="assets\flags\BR.png" />
+    <None Remove="assets\flags\BS.png" />
+    <None Remove="assets\flags\BT.png" />
+    <None Remove="assets\flags\BW.png" />
+    <None Remove="assets\flags\BY.png" />
+    <None Remove="assets\flags\BZ.png" />
+    <None Remove="assets\flags\CA.png" />
+    <None Remove="assets\flags\CC.png" />
+    <None Remove="assets\flags\CD.png" />
+    <None Remove="assets\flags\CF.png" />
+    <None Remove="assets\flags\CG.png" />
+    <None Remove="assets\flags\CH.png" />
+    <None Remove="assets\flags\CI.png" />
+    <None Remove="assets\flags\CK.png" />
+    <None Remove="assets\flags\CL.png" />
+    <None Remove="assets\flags\CM.png" />
+    <None Remove="assets\flags\CN.png" />
+    <None Remove="assets\flags\CO.png" />
+    <None Remove="assets\flags\CP.png" />
+    <None Remove="assets\flags\CR.png" />
+    <None Remove="assets\flags\CU.png" />
+    <None Remove="assets\flags\CV.png" />
+    <None Remove="assets\flags\CW.png" />
+    <None Remove="assets\flags\CX.png" />
+    <None Remove="assets\flags\CY.png" />
+    <None Remove="assets\flags\CZ.png" />
+    <None Remove="assets\flags\DE.png" />
+    <None Remove="assets\flags\DJ.png" />
+    <None Remove="assets\flags\DK.png" />
+    <None Remove="assets\flags\DM.png" />
+    <None Remove="assets\flags\DO.png" />
+    <None Remove="assets\flags\DZ.png" />
+    <None Remove="assets\flags\EC.png" />
+    <None Remove="assets\flags\EE.png" />
+    <None Remove="assets\flags\EG.png" />
+    <None Remove="assets\flags\EH.png" />
+    <None Remove="assets\flags\EN.png" />
+    <None Remove="assets\flags\ER.png" />
+    <None Remove="assets\flags\ES.png" />
+    <None Remove="assets\flags\ET.png" />
+    <None Remove="assets\flags\EU.png" />
+    <None Remove="assets\flags\FI.png" />
+    <None Remove="assets\flags\FJ.png" />
+    <None Remove="assets\flags\FK.png" />
+    <None Remove="assets\flags\FM.png" />
+    <None Remove="assets\flags\FO.png" />
+    <None Remove="assets\flags\FR.png" />
+    <None Remove="assets\flags\GA.png" />
+    <None Remove="assets\flags\GB.png" />
+    <None Remove="assets\flags\GD.png" />
+    <None Remove="assets\flags\GE.png" />
+    <None Remove="assets\flags\GG.png" />
+    <None Remove="assets\flags\GH.png" />
+    <None Remove="assets\flags\GI.png" />
+    <None Remove="assets\flags\GL.png" />
+    <None Remove="assets\flags\GM.png" />
+    <None Remove="assets\flags\GN.png" />
+    <None Remove="assets\flags\GQ.png" />
+    <None Remove="assets\flags\GR.png" />
+    <None Remove="assets\flags\GS.png" />
+    <None Remove="assets\flags\GT.png" />
+    <None Remove="assets\flags\GU.png" />
+    <None Remove="assets\flags\GW.png" />
+    <None Remove="assets\flags\GY.png" />
+    <None Remove="assets\flags\HK.png" />
+    <None Remove="assets\flags\HN.png" />
+    <None Remove="assets\flags\HR.png" />
+    <None Remove="assets\flags\HT.png" />
+    <None Remove="assets\flags\HU.png" />
+    <None Remove="assets\flags\IC.png" />
+    <None Remove="assets\flags\ID.png" />
+    <None Remove="assets\flags\IE.png" />
+    <None Remove="assets\flags\IL.png" />
+    <None Remove="assets\flags\IM.png" />
+    <None Remove="assets\flags\IN.png" />
+    <None Remove="assets\flags\IQ.png" />
+    <None Remove="assets\flags\IR.png" />
+    <None Remove="assets\flags\IS.png" />
+    <None Remove="assets\flags\IT.png" />
+    <None Remove="assets\flags\JE.png" />
+    <None Remove="assets\flags\JM.png" />
+    <None Remove="assets\flags\JO.png" />
+    <None Remove="assets\flags\JP.png" />
+    <None Remove="assets\flags\KE.png" />
+    <None Remove="assets\flags\KG.png" />
+    <None Remove="assets\flags\KH.png" />
+    <None Remove="assets\flags\KI.png" />
+    <None Remove="assets\flags\KM.png" />
+    <None Remove="assets\flags\KN.png" />
+    <None Remove="assets\flags\KP.png" />
+    <None Remove="assets\flags\KR.png" />
+    <None Remove="assets\flags\KW.png" />
+    <None Remove="assets\flags\KY.png" />
+    <None Remove="assets\flags\KZ.png" />
+    <None Remove="assets\flags\LA.png" />
+    <None Remove="assets\flags\LB.png" />
+    <None Remove="assets\flags\LC.png" />
+    <None Remove="assets\flags\LI.png" />
+    <None Remove="assets\flags\LK.png" />
+    <None Remove="assets\flags\LR.png" />
+    <None Remove="assets\flags\LS.png" />
+    <None Remove="assets\flags\LT.png" />
+    <None Remove="assets\flags\LU.png" />
+    <None Remove="assets\flags\LV.png" />
+    <None Remove="assets\flags\LY.png" />
+    <None Remove="assets\flags\MA.png" />
+    <None Remove="assets\flags\MC.png" />
+    <None Remove="assets\flags\MD.png" />
+    <None Remove="assets\flags\ME.png" />
+    <None Remove="assets\flags\MF.png" />
+    <None Remove="assets\flags\MG.png" />
+    <None Remove="assets\flags\MH.png" />
+    <None Remove="assets\flags\MK.png" />
+    <None Remove="assets\flags\ML.png" />
+    <None Remove="assets\flags\MM.png" />
+    <None Remove="assets\flags\MN.png" />
+    <None Remove="assets\flags\MO.png" />
+    <None Remove="assets\flags\MP.png" />
+    <None Remove="assets\flags\MQ.png" />
+    <None Remove="assets\flags\MR.png" />
+    <None Remove="assets\flags\MS.png" />
+    <None Remove="assets\flags\MT.png" />
+    <None Remove="assets\flags\MU.png" />
+    <None Remove="assets\flags\MV.png" />
+    <None Remove="assets\flags\MW.png" />
+    <None Remove="assets\flags\MX.png" />
+    <None Remove="assets\flags\MY.png" />
+    <None Remove="assets\flags\MZ.png" />
+    <None Remove="assets\flags\NA.png" />
+    <None Remove="assets\flags\NC.png" />
+    <None Remove="assets\flags\NE.png" />
+    <None Remove="assets\flags\NF.png" />
+    <None Remove="assets\flags\NG.png" />
+    <None Remove="assets\flags\NI.png" />
+    <None Remove="assets\flags\NL.png" />
+    <None Remove="assets\flags\NO.png" />
+    <None Remove="assets\flags\NP.png" />
+    <None Remove="assets\flags\NR.png" />
+    <None Remove="assets\flags\NU.png" />
+    <None Remove="assets\flags\NZ.png" />
+    <None Remove="assets\flags\OM.png" />
+    <None Remove="assets\flags\PA.png" />
+    <None Remove="assets\flags\PE.png" />
+    <None Remove="assets\flags\PF.png" />
+    <None Remove="assets\flags\PG.png" />
+    <None Remove="assets\flags\PH.png" />
+    <None Remove="assets\flags\PK.png" />
+    <None Remove="assets\flags\PL.png" />
+    <None Remove="assets\flags\PN.png" />
+    <None Remove="assets\flags\PR.png" />
+    <None Remove="assets\flags\PS.png" />
+    <None Remove="assets\flags\PT.png" />
+    <None Remove="assets\flags\PW.png" />
+    <None Remove="assets\flags\PY.png" />
+    <None Remove="assets\flags\QA.png" />
+    <None Remove="assets\flags\RO.png" />
+    <None Remove="assets\flags\RS.png" />
+    <None Remove="assets\flags\RU.png" />
+    <None Remove="assets\flags\RW.png" />
+    <None Remove="assets\flags\SA.png" />
+    <None Remove="assets\flags\SB.png" />
+    <None Remove="assets\flags\SC.png" />
+    <None Remove="assets\flags\SD.png" />
+    <None Remove="assets\flags\SE.png" />
+    <None Remove="assets\flags\SG.png" />
+    <None Remove="assets\flags\SH.png" />
+    <None Remove="assets\flags\SI.png" />
+    <None Remove="assets\flags\SK.png" />
+    <None Remove="assets\flags\SL.png" />
+    <None Remove="assets\flags\SM.png" />
+    <None Remove="assets\flags\SN.png" />
+    <None Remove="assets\flags\SO.png" />
+    <None Remove="assets\flags\SR.png" />
+    <None Remove="assets\flags\SS.png" />
+    <None Remove="assets\flags\ST.png" />
+    <None Remove="assets\flags\SV.png" />
+    <None Remove="assets\flags\SY.png" />
+    <None Remove="assets\flags\SZ.png" />
+    <None Remove="assets\flags\TC.png" />
+    <None Remove="assets\flags\TD.png" />
+    <None Remove="assets\flags\TF.png" />
+    <None Remove="assets\flags\TG.png" />
+    <None Remove="assets\flags\TH.png" />
+    <None Remove="assets\flags\TJ.png" />
+    <None Remove="assets\flags\TK.png" />
+    <None Remove="assets\flags\TL.png" />
+    <None Remove="assets\flags\TM.png" />
+    <None Remove="assets\flags\TN.png" />
+    <None Remove="assets\flags\TO.png" />
+    <None Remove="assets\flags\TR.png" />
+    <None Remove="assets\flags\TT.png" />
+    <None Remove="assets\flags\TV.png" />
+    <None Remove="assets\flags\TW.png" />
+    <None Remove="assets\flags\TZ.png" />
+    <None Remove="assets\flags\UA.png" />
+    <None Remove="assets\flags\UG.png" />
+    <None Remove="assets\flags\US.png" />
+    <None Remove="assets\flags\UY.png" />
+    <None Remove="assets\flags\UZ.png" />
+    <None Remove="assets\flags\VA.png" />
+    <None Remove="assets\flags\VC.png" />
+    <None Remove="assets\flags\VE.png" />
+    <None Remove="assets\flags\VG.png" />
+    <None Remove="assets\flags\VI.png" />
+    <None Remove="assets\flags\VN.png" />
+    <None Remove="assets\flags\VU.png" />
+    <None Remove="assets\flags\WF.png" />
+    <None Remove="assets\flags\WS.png" />
+    <None Remove="assets\flags\YE.png" />
+    <None Remove="assets\flags\YT.png" />
+    <None Remove="assets\flags\ZA.png" />
+    <None Remove="assets\flags\ZM.png" />
+    <None Remove="assets\flags\ZW.png" />
+    <None Remove="assets\ui\bean\bean_frighten.png" />
+    <None Remove="assets\ui\bean\bean_victorious.png" />
+    <None Remove="assets\ui\betterfglogo.png" />
+    <None Remove="assets\ui\betterfg_splash.png" />
+    <None Remove="assets\ui\cursor.png" />
+    <None Remove="assets\ui\cskins\bg.png" />
+    <None Remove="assets\ui\cskins\bg_hover.png" />
+    <None Remove="assets\ui\dropdown.png" />
+    <None Remove="assets\ui\emoticonsphrases\bg.png" />
+    <None Remove="assets\ui\emoticonsphrases\wheel.png" />
+    <None Remove="assets\ui\feature\featurequalificationtime_favoritedstar.png" />
+    <None Remove="assets\ui\feature\featurequalificationtime_favoritestar.png" />
+    <None Remove="assets\ui\feature\featurequalificationtime_icon.png" />
+    <None Remove="assets\ui\feature\featuretrophy_trophy.png" />
+    <None Remove="assets\ui\feature\qualificationtime\featurequalificationtime_favoritedstar.png" />
+    <None Remove="assets\ui\feature\qualificationtime\featurequalificationtime_favoritestar.png" />
+    <None Remove="assets\ui\feature\qualificationtime\featurequalificationtime_icon.png" />
+    <None Remove="assets\ui\feature\qualificationtime\featurequalificationtime_delete.png" />
+    <None Remove="assets\ui\feature\qualificationtime\featurequalificationtime_delete_idle.png" />
+    <None Remove="assets\ui\feature\moreplatformicon\featuremoreplatformicon_platformicons.png" />
+    <None Remove="assets\ui\feature\moreplatformicon\featuremoreplatformicon_platformicons_outline.png" />
+    <None Remove="assets\ui\feature\moreplatformicon\no.png" />
+    <None Remove="assets\ui\feature\star\featurestar_star.png" />
+    <None Remove="assets\ui\feature\timeplacement\rowbackground.png" />
+    <None Remove="assets\ui\general\button.png" />
+    <None Remove="assets\ui\general\button_shine.png" />
+    <None Remove="assets\ui\general\radialgradcorner128.png" />
+    <None Remove="assets\features\customnameplate\nameplate_fill.png" />
+    <None Remove="assets\features\customnameplate\nameplate_outline.png" />
+    <None Remove="assets\ui\general\UI_background.png" />
+    <None Remove="assets\ui\general\pattern_crown.png" />
+    <None Remove="assets\ui\general\pattern_crown_blue.png" />
+    <None Remove="assets\ui\general\pattern_crown_yellow.png" />
+    <None Remove="assets\ui\general\pattern_ss3.png" />
+    <None Remove="assets\ui\nametag\bg.png" />
+    <None Remove="assets\ui\nametag\example.png" />
+    <None Remove="assets\ui\side\audioset.png" />
+    <None Remove="assets\ui\side\keybindset.png" />
+    <None Remove="assets\ui\side\menumusicset.png" />
+    <None Remove="assets\ui\side\nameset.png" />
+    <None Remove="assets\ui\side\presetset.png" />
+    <None Remove="assets\ui\side\profileset.png" />
+    <None Remove="assets\ui\side\scaleset.png" />
+    <None Remove="assets\ui\side\tweakset.png" />
+    <None Remove="assets\ui\startupwindow\bg.png" />
+    <None Remove="assets\ui\startupwindow\bg_hover.png" />
+    <None Remove="assets\ui\startupwindow\orey.png" />
+    <None Remove="assets\ui\tab\allcosm.png" />
+    <None Remove="assets\ui\tab\customskintexture.png" />
+    <None Remove="assets\ui\tab\features.png" />
+    <None Remove="assets\ui\tab\menu.png" />
+    <None Remove="assets\ui\tab\pb.png" />
+    <None Remove="assets\ui\tab\ui.png" />
+    <None Remove="assets\ui\uiscreen\fallforce.png" />
+    <None Remove="assets\ui\uiscreen\final.png" />
+    <None Remove="assets\ui\uiscreen\explore.png" />
+    <None Remove="assets\ui\uiscreen\fallingscreen.png" />
+    <None Remove="assets\ui\pb\solosbutton.png" />
+    <None Remove="assets\ui\pb\duosbutton.png" />
+    <None Remove="assets\ui\pb\squadsbutton.png" />
+    <None Remove="assets\ui\button\filter.png" />
+    <None Remove="assets\ui\button\sort.png" />
+    <None Remove="assets\ui\button\search.png" />
+    <None Remove="assets\ui\windows\audiosettingsbg.png" />
+    <None Remove="assets\ui\windows\generalbg.png" />
+    <None Remove="assets\ui\windows\generalbg_2.png" />
+    <None Remove="assets\ui\windows\generalbg_2_hover.png" />
+    <None Remove="assets\ui\windows\generalbg_hover.png" />
+    <None Remove="assets\ui\windows\general_standalone_bg.png" />
+    <None Remove="assets\ui\windows\general_update_bg.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="assets\audio\apply.wav" />
+    <EmbeddedResource Include="assets\audio\buttonclick.wav" />
+    <EmbeddedResource Include="assets\audio\buttonhoveron.wav" />
+    <EmbeddedResource Include="assets\audio\click.wav" />
+    <EmbeddedResource Include="assets\audio\hideui.wav" />
+    <EmbeddedResource Include="assets\audio\pb.wav" />
+    <EmbeddedResource Include="assets\audio\poof003.wav" />
+    <EmbeddedResource Include="assets\audio\showui.wav" />
+    <EmbeddedResource Include="assets\audio\slotdropdown.wav" />
+    <EmbeddedResource Include="assets\audio\starsup.wav" />
+    <EmbeddedResource Include="assets\audio\tabclose.wav" />
+    <EmbeddedResource Include="assets\audio\tabopen.wav" />
+    <EmbeddedResource Include="assets\audio\tipshow.wav" />
+    <EmbeddedResource Include="assets\bundles\betterfg_menubg" />
+    <EmbeddedResource Include="assets\bundles\betterfg_startup" />
+    <EmbeddedResource Include="assets\bundles\bettrfg_backdropgradient" />
+    <EmbeddedResource Include="assets\bundles\bettrfg_ui_shader" />
+    <EmbeddedResource Include="assets\bundles\bettrfg_ui_warp" />
+    <EmbeddedResource Include="assets\bundles\material_invisible" />
+    <EmbeddedResource Include="assets\bundles\bettrfg_mat_ghost" />
+    <EmbeddedResource Include="assets\bundles\vfx_poof" />
+    <EmbeddedResource Include="assets\bundles\bettrfg_anim_eyes" />
+    <EmbeddedResource Include="assets\flags\AD.png" />
+    <EmbeddedResource Include="assets\flags\AE.png" />
+    <EmbeddedResource Include="assets\flags\AF.png" />
+    <EmbeddedResource Include="assets\flags\AG.png" />
+    <EmbeddedResource Include="assets\flags\AI.png" />
+    <EmbeddedResource Include="assets\flags\AL.png" />
+    <EmbeddedResource Include="assets\flags\AM.png" />
+    <EmbeddedResource Include="assets\flags\AN.png" />
+    <EmbeddedResource Include="assets\flags\AO.png" />
+    <EmbeddedResource Include="assets\flags\AQ.png" />
+    <EmbeddedResource Include="assets\flags\AR.png" />
+    <EmbeddedResource Include="assets\flags\AS.png" />
+    <EmbeddedResource Include="assets\flags\AT.png" />
+    <EmbeddedResource Include="assets\flags\AU.png" />
+    <EmbeddedResource Include="assets\flags\AW.png" />
+    <EmbeddedResource Include="assets\flags\AX.png" />
+    <EmbeddedResource Include="assets\flags\AZ.png" />
+    <EmbeddedResource Include="assets\flags\BA.png" />
+    <EmbeddedResource Include="assets\flags\BB.png" />
+    <EmbeddedResource Include="assets\flags\BD.png" />
+    <EmbeddedResource Include="assets\flags\BE.png" />
+    <EmbeddedResource Include="assets\flags\BF.png" />
+    <EmbeddedResource Include="assets\flags\BG.png" />
+    <EmbeddedResource Include="assets\flags\BH.png" />
+    <EmbeddedResource Include="assets\flags\BI.png" />
+    <EmbeddedResource Include="assets\flags\BJ.png" />
+    <EmbeddedResource Include="assets\flags\BL.png" />
+    <EmbeddedResource Include="assets\flags\BM.png" />
+    <EmbeddedResource Include="assets\flags\BN.png" />
+    <EmbeddedResource Include="assets\flags\BO.png" />
+    <EmbeddedResource Include="assets\flags\BR.png" />
+    <EmbeddedResource Include="assets\flags\BS.png" />
+    <EmbeddedResource Include="assets\flags\BT.png" />
+    <EmbeddedResource Include="assets\flags\BW.png" />
+    <EmbeddedResource Include="assets\flags\BY.png" />
+    <EmbeddedResource Include="assets\flags\BZ.png" />
+    <EmbeddedResource Include="assets\flags\CA.png" />
+    <EmbeddedResource Include="assets\flags\CC.png" />
+    <EmbeddedResource Include="assets\flags\CD.png" />
+    <EmbeddedResource Include="assets\flags\CF.png" />
+    <EmbeddedResource Include="assets\flags\CG.png" />
+    <EmbeddedResource Include="assets\flags\CH.png" />
+    <EmbeddedResource Include="assets\flags\CI.png" />
+    <EmbeddedResource Include="assets\flags\CK.png" />
+    <EmbeddedResource Include="assets\flags\CL.png" />
+    <EmbeddedResource Include="assets\flags\CM.png" />
+    <EmbeddedResource Include="assets\flags\CN.png" />
+    <EmbeddedResource Include="assets\flags\CO.png" />
+    <EmbeddedResource Include="assets\flags\CP.png" />
+    <EmbeddedResource Include="assets\flags\CR.png" />
+    <EmbeddedResource Include="assets\flags\CU.png" />
+    <EmbeddedResource Include="assets\flags\CV.png" />
+    <EmbeddedResource Include="assets\flags\CW.png" />
+    <EmbeddedResource Include="assets\flags\CX.png" />
+    <EmbeddedResource Include="assets\flags\CY.png" />
+    <EmbeddedResource Include="assets\flags\CZ.png" />
+    <EmbeddedResource Include="assets\flags\DE.png" />
+    <EmbeddedResource Include="assets\flags\DJ.png" />
+    <EmbeddedResource Include="assets\flags\DK.png" />
+    <EmbeddedResource Include="assets\flags\DM.png" />
+    <EmbeddedResource Include="assets\flags\DO.png" />
+    <EmbeddedResource Include="assets\flags\DZ.png" />
+    <EmbeddedResource Include="assets\flags\EC.png" />
+    <EmbeddedResource Include="assets\flags\EE.png" />
+    <EmbeddedResource Include="assets\flags\EG.png" />
+    <EmbeddedResource Include="assets\flags\EH.png" />
+    <EmbeddedResource Include="assets\flags\EN.png" />
+    <EmbeddedResource Include="assets\flags\ER.png" />
+    <EmbeddedResource Include="assets\flags\ES.png" />
+    <EmbeddedResource Include="assets\flags\ET.png" />
+    <EmbeddedResource Include="assets\flags\EU.png" />
+    <EmbeddedResource Include="assets\flags\FI.png" />
+    <EmbeddedResource Include="assets\flags\FJ.png" />
+    <EmbeddedResource Include="assets\flags\FK.png" />
+    <EmbeddedResource Include="assets\flags\FM.png" />
+    <EmbeddedResource Include="assets\flags\FO.png" />
+    <EmbeddedResource Include="assets\flags\FR.png" />
+    <EmbeddedResource Include="assets\flags\GA.png" />
+    <EmbeddedResource Include="assets\flags\GB.png" />
+    <EmbeddedResource Include="assets\flags\GD.png" />
+    <EmbeddedResource Include="assets\flags\GE.png" />
+    <EmbeddedResource Include="assets\flags\GG.png" />
+    <EmbeddedResource Include="assets\flags\GH.png" />
+    <EmbeddedResource Include="assets\flags\GI.png" />
+    <EmbeddedResource Include="assets\flags\GL.png" />
+    <EmbeddedResource Include="assets\flags\GM.png" />
+    <EmbeddedResource Include="assets\flags\GN.png" />
+    <EmbeddedResource Include="assets\flags\GQ.png" />
+    <EmbeddedResource Include="assets\flags\GR.png" />
+    <EmbeddedResource Include="assets\flags\GS.png" />
+    <EmbeddedResource Include="assets\flags\GT.png" />
+    <EmbeddedResource Include="assets\flags\GU.png" />
+    <EmbeddedResource Include="assets\flags\GW.png" />
+    <EmbeddedResource Include="assets\flags\GY.png" />
+    <EmbeddedResource Include="assets\flags\HK.png" />
+    <EmbeddedResource Include="assets\flags\HN.png" />
+    <EmbeddedResource Include="assets\flags\HR.png" />
+    <EmbeddedResource Include="assets\flags\HT.png" />
+    <EmbeddedResource Include="assets\flags\HU.png" />
+    <EmbeddedResource Include="assets\flags\IC.png" />
+    <EmbeddedResource Include="assets\flags\ID.png" />
+    <EmbeddedResource Include="assets\flags\IE.png" />
+    <EmbeddedResource Include="assets\flags\IL.png" />
+    <EmbeddedResource Include="assets\flags\IM.png" />
+    <EmbeddedResource Include="assets\flags\IN.png" />
+    <EmbeddedResource Include="assets\flags\IQ.png" />
+    <EmbeddedResource Include="assets\flags\IR.png" />
+    <EmbeddedResource Include="assets\flags\IS.png" />
+    <EmbeddedResource Include="assets\flags\IT.png" />
+    <EmbeddedResource Include="assets\flags\JE.png" />
+    <EmbeddedResource Include="assets\flags\JM.png" />
+    <EmbeddedResource Include="assets\flags\JO.png" />
+    <EmbeddedResource Include="assets\flags\JP.png" />
+    <EmbeddedResource Include="assets\flags\KE.png" />
+    <EmbeddedResource Include="assets\flags\KG.png" />
+    <EmbeddedResource Include="assets\flags\KH.png" />
+    <EmbeddedResource Include="assets\flags\KI.png" />
+    <EmbeddedResource Include="assets\flags\KM.png" />
+    <EmbeddedResource Include="assets\flags\KN.png" />
+    <EmbeddedResource Include="assets\flags\KP.png" />
+    <EmbeddedResource Include="assets\flags\KR.png" />
+    <EmbeddedResource Include="assets\flags\KW.png" />
+    <EmbeddedResource Include="assets\flags\KY.png" />
+    <EmbeddedResource Include="assets\flags\KZ.png" />
+    <EmbeddedResource Include="assets\flags\LA.png" />
+    <EmbeddedResource Include="assets\flags\LB.png" />
+    <EmbeddedResource Include="assets\flags\LC.png" />
+    <EmbeddedResource Include="assets\flags\LI.png" />
+    <EmbeddedResource Include="assets\flags\LK.png" />
+    <EmbeddedResource Include="assets\flags\LR.png" />
+    <EmbeddedResource Include="assets\flags\LS.png" />
+    <EmbeddedResource Include="assets\flags\LT.png" />
+    <EmbeddedResource Include="assets\flags\LU.png" />
+    <EmbeddedResource Include="assets\flags\LV.png" />
+    <EmbeddedResource Include="assets\flags\LY.png" />
+    <EmbeddedResource Include="assets\flags\MA.png" />
+    <EmbeddedResource Include="assets\flags\MC.png" />
+    <EmbeddedResource Include="assets\flags\MD.png" />
+    <EmbeddedResource Include="assets\flags\ME.png" />
+    <EmbeddedResource Include="assets\flags\MF.png" />
+    <EmbeddedResource Include="assets\flags\MG.png" />
+    <EmbeddedResource Include="assets\flags\MH.png" />
+    <EmbeddedResource Include="assets\flags\MK.png" />
+    <EmbeddedResource Include="assets\flags\ML.png" />
+    <EmbeddedResource Include="assets\flags\MM.png" />
+    <EmbeddedResource Include="assets\flags\MN.png" />
+    <EmbeddedResource Include="assets\flags\MO.png" />
+    <EmbeddedResource Include="assets\flags\MP.png" />
+    <EmbeddedResource Include="assets\flags\MQ.png" />
+    <EmbeddedResource Include="assets\flags\MR.png" />
+    <EmbeddedResource Include="assets\flags\MS.png" />
+    <EmbeddedResource Include="assets\flags\MT.png" />
+    <EmbeddedResource Include="assets\flags\MU.png" />
+    <EmbeddedResource Include="assets\flags\MV.png" />
+    <EmbeddedResource Include="assets\flags\MW.png" />
+    <EmbeddedResource Include="assets\flags\MX.png" />
+    <EmbeddedResource Include="assets\flags\MY.png" />
+    <EmbeddedResource Include="assets\flags\MZ.png" />
+    <EmbeddedResource Include="assets\flags\NA.png" />
+    <EmbeddedResource Include="assets\flags\NC.png" />
+    <EmbeddedResource Include="assets\flags\NE.png" />
+    <EmbeddedResource Include="assets\flags\NF.png" />
+    <EmbeddedResource Include="assets\flags\NG.png" />
+    <EmbeddedResource Include="assets\flags\NI.png" />
+    <EmbeddedResource Include="assets\flags\NL.png" />
+    <EmbeddedResource Include="assets\flags\NO.png" />
+    <EmbeddedResource Include="assets\flags\NP.png" />
+    <EmbeddedResource Include="assets\flags\NR.png" />
+    <EmbeddedResource Include="assets\flags\NU.png" />
+    <EmbeddedResource Include="assets\flags\NZ.png" />
+    <EmbeddedResource Include="assets\flags\OM.png" />
+    <EmbeddedResource Include="assets\flags\PA.png" />
+    <EmbeddedResource Include="assets\flags\PE.png" />
+    <EmbeddedResource Include="assets\flags\PF.png" />
+    <EmbeddedResource Include="assets\flags\PG.png" />
+    <EmbeddedResource Include="assets\flags\PH.png" />
+    <EmbeddedResource Include="assets\flags\PK.png" />
+    <EmbeddedResource Include="assets\flags\PL.png" />
+    <EmbeddedResource Include="assets\flags\PN.png" />
+    <EmbeddedResource Include="assets\flags\PR.png" />
+    <EmbeddedResource Include="assets\flags\PS.png" />
+    <EmbeddedResource Include="assets\flags\PT.png" />
+    <EmbeddedResource Include="assets\flags\PW.png" />
+    <EmbeddedResource Include="assets\flags\PY.png" />
+    <EmbeddedResource Include="assets\flags\QA.png" />
+    <EmbeddedResource Include="assets\flags\RO.png" />
+    <EmbeddedResource Include="assets\flags\RS.png" />
+    <EmbeddedResource Include="assets\flags\RU.png" />
+    <EmbeddedResource Include="assets\flags\RW.png" />
+    <EmbeddedResource Include="assets\flags\SA.png" />
+    <EmbeddedResource Include="assets\flags\SB.png" />
+    <EmbeddedResource Include="assets\flags\SC.png" />
+    <EmbeddedResource Include="assets\flags\SD.png" />
+    <EmbeddedResource Include="assets\flags\SE.png" />
+    <EmbeddedResource Include="assets\flags\SG.png" />
+    <EmbeddedResource Include="assets\flags\SH.png" />
+    <EmbeddedResource Include="assets\flags\SI.png" />
+    <EmbeddedResource Include="assets\flags\SK.png" />
+    <EmbeddedResource Include="assets\flags\SL.png" />
+    <EmbeddedResource Include="assets\flags\SM.png" />
+    <EmbeddedResource Include="assets\flags\SN.png" />
+    <EmbeddedResource Include="assets\flags\SO.png" />
+    <EmbeddedResource Include="assets\flags\SR.png" />
+    <EmbeddedResource Include="assets\flags\SS.png" />
+    <EmbeddedResource Include="assets\flags\ST.png" />
+    <EmbeddedResource Include="assets\flags\SV.png" />
+    <EmbeddedResource Include="assets\flags\SY.png" />
+    <EmbeddedResource Include="assets\flags\SZ.png" />
+    <EmbeddedResource Include="assets\flags\TC.png" />
+    <EmbeddedResource Include="assets\flags\TD.png" />
+    <EmbeddedResource Include="assets\flags\TF.png" />
+    <EmbeddedResource Include="assets\flags\TG.png" />
+    <EmbeddedResource Include="assets\flags\TH.png" />
+    <EmbeddedResource Include="assets\flags\TJ.png" />
+    <EmbeddedResource Include="assets\flags\TK.png" />
+    <EmbeddedResource Include="assets\flags\TL.png" />
+    <EmbeddedResource Include="assets\flags\TM.png" />
+    <EmbeddedResource Include="assets\flags\TN.png" />
+    <EmbeddedResource Include="assets\flags\TO.png" />
+    <EmbeddedResource Include="assets\flags\TR.png" />
+    <EmbeddedResource Include="assets\flags\TT.png" />
+    <EmbeddedResource Include="assets\flags\TV.png" />
+    <EmbeddedResource Include="assets\flags\TW.png" />
+    <EmbeddedResource Include="assets\flags\TZ.png" />
+    <EmbeddedResource Include="assets\flags\UA.png" />
+    <EmbeddedResource Include="assets\flags\UG.png" />
+    <EmbeddedResource Include="assets\flags\US.png" />
+    <EmbeddedResource Include="assets\flags\UY.png" />
+    <EmbeddedResource Include="assets\flags\UZ.png" />
+    <EmbeddedResource Include="assets\flags\VA.png" />
+    <EmbeddedResource Include="assets\flags\VC.png" />
+    <EmbeddedResource Include="assets\flags\VE.png" />
+    <EmbeddedResource Include="assets\flags\VG.png" />
+    <EmbeddedResource Include="assets\flags\VI.png" />
+    <EmbeddedResource Include="assets\flags\VN.png" />
+    <EmbeddedResource Include="assets\flags\VU.png" />
+    <EmbeddedResource Include="assets\flags\WF.png" />
+    <EmbeddedResource Include="assets\flags\WS.png" />
+    <EmbeddedResource Include="assets\flags\YE.png" />
+    <EmbeddedResource Include="assets\flags\YT.png" />
+    <EmbeddedResource Include="assets\flags\ZA.png" />
+    <EmbeddedResource Include="assets\flags\ZM.png" />
+    <EmbeddedResource Include="assets\flags\ZW.png" />
+    <EmbeddedResource Include="assets\ui\bean\bean_frighten.png" />
+    <EmbeddedResource Include="assets\ui\bean\bean_victorious.png" />
+    <EmbeddedResource Include="assets\ui\betterfglogo.png" />
+    <EmbeddedResource Include="assets\ui\betterfg_splash.png" />
+    <EmbeddedResource Include="assets\ui\cursor.png" />
+    <EmbeddedResource Include="assets\ui\cskins\bg.png" />
+    <EmbeddedResource Include="assets\ui\bg_hover.png" />
+    <EmbeddedResource Include="assets\ui\dropdown.png" />
+    <EmbeddedResource Include="assets\ui\emoticonsphrases\arrow.png" />
+    <EmbeddedResource Include="assets\ui\emoticonsphrases\bg.png" />
+    <EmbeddedResource Include="assets\ui\emoticonsphrases\wheel.png" />
+    <EmbeddedResource Include="assets\ui\feature\qualificationtime\bg.png" />
+    <EmbeddedResource Include="assets\ui\feature\qualificationtime\featurequalificationtime_favoritedstar.png" />
+    <EmbeddedResource Include="assets\ui\feature\qualificationtime\featurequalificationtime_favoritestar.png" />
+    <EmbeddedResource Include="assets\ui\feature\qualificationtime\featurequalificationtime_icon.png" />
+    <EmbeddedResource Include="assets\ui\feature\qualificationtime\featurequalificationtime_delete.png" />
+    <EmbeddedResource Include="assets\ui\feature\qualificationtime\featurequalificationtime_delete_idle.png" />
+    <EmbeddedResource Include="assets\ui\feature\moreplatformicon\featuremoreplatformicon_platformicons.png" />
+    <EmbeddedResource Include="assets\ui\feature\moreplatformicon\featuremoreplatformicon_platformicons_outline.png" />
+    <EmbeddedResource Include="assets\ui\feature\moreplatformicon\no.png" />
+    <EmbeddedResource Include="assets\ui\feature\star\featurestar_star.png" />
+    <EmbeddedResource Include="assets\ui\feature\timeplacement\rowbackground.png" />
+    <EmbeddedResource Include="assets\ui\general\button.png" />
+    <EmbeddedResource Include="assets\ui\general\button_shine.png" />
+    <EmbeddedResource Include="assets\ui\general\radialgradcorner128.png" />
+    <EmbeddedResource Include="assets\ui\general\UI_background.png" />
+    <EmbeddedResource Include="assets\ui\general\pattern_crown.png" />
+    <EmbeddedResource Include="assets\ui\general\pattern_crown_blue.png" />
+    <EmbeddedResource Include="assets\ui\general\pattern_crown_yellow.png" />
+    <EmbeddedResource Include="assets\ui\general\pattern_ss3.png" />
+    <EmbeddedResource Include="assets\ui\side\menumusicset.png" />
+    <EmbeddedResource Include="assets\ui\uiscreen\fallforce.png" />
+    <EmbeddedResource Include="assets\ui\uiscreen\final.png" />
+    <EmbeddedResource Include="assets\ui\uiscreen\explore.png" />
+    <EmbeddedResource Include="assets\ui\uiscreen\fallingscreen.png" />
+    <EmbeddedResource Include="assets\features\customnameplate\nameplate_fill.png" />
+    <EmbeddedResource Include="assets\features\customnameplate\nameplate_outline.png" />
+    <EmbeddedResource Include="assets\ui\nametag\bg.png" />
+    <EmbeddedResource Include="assets\ui\side\audioset.png" />
+    <EmbeddedResource Include="assets\ui\side\keybindset.png" />
+    <EmbeddedResource Include="assets\ui\side\nameset.png" />
+    <EmbeddedResource Include="assets\ui\side\presetset.png" />
+    <EmbeddedResource Include="assets\ui\side\profileset.png" />
+    <EmbeddedResource Include="assets\ui\side\scaleset.png" />
+    <EmbeddedResource Include="assets\ui\side\tweakset.png" />
+    <EmbeddedResource Include="assets\ui\startupwindow\bg.png" />
+    <EmbeddedResource Include="assets\ui\startupwindow\bg_hover.png" />
+    <EmbeddedResource Include="assets\ui\startupwindow\orey.png" />
+    <EmbeddedResource Include="assets\ui\tab\allcosm.png" />
+    <EmbeddedResource Include="assets\ui\tab\customskintexture.png" />
+    <EmbeddedResource Include="assets\ui\tab\features.png" />
+    <EmbeddedResource Include="assets\ui\tab\menu.png" />
+    <EmbeddedResource Include="assets\ui\tab\pb.png" />
+    <EmbeddedResource Include="assets\ui\tab\ui.png" />
+    <EmbeddedResource Include="assets\ui\pb\solosbutton.png" />
+    <EmbeddedResource Include="assets\ui\pb\duosbutton.png" />
+    <EmbeddedResource Include="assets\ui\pb\squadsbutton.png" />
+    <EmbeddedResource Include="assets\ui\button\filter.png" />
+    <EmbeddedResource Include="assets\ui\button\sort.png" />
+    <EmbeddedResource Include="assets\ui\button\search.png" />
+    <EmbeddedResource Include="assets\ui\windows\audiosettingsbg.png" />
+    <EmbeddedResource Include="assets\ui\windows\generalbg.png" />
+    <EmbeddedResource Include="assets\ui\windows\generalbg_2.png" />
+    <EmbeddedResource Include="assets\ui\windows\generalbg_2_hover.png" />
+    <EmbeddedResource Include="assets\ui\windows\generalbg_hover.png" />
+    <EmbeddedResource Include="assets\ui\windows\general_standalone_bg.png" />
+    <EmbeddedResource Include="assets\ui\windows\general_update_bg.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BepInEx.Unity.IL2CPP" Version="6.0.0-be.*" IncludeAssets="compile" />
+    <PackageReference Include="BepInEx.PluginInfoProps" Version="2.*" />
+    <PackageReference Include="NAudio.Core" Version="2.3.0" />
+	<PackageReference Include="NAudio.WinMM" Version="2.3.0" />
+	<PackageReference Include="NAudio" Version="2.3.0" />
+	<PackageReference Include="System.Management" Version="10.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Customization\Round\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="0Harmony">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\core\0Harmony.dll</HintPath>
+    </Reference>
+    <Reference Include="AsmResolver">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\core\AsmResolver.dll</HintPath>
+    </Reference>
+    <Reference Include="AsmResolver.DotNet">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\core\AsmResolver.DotNet.dll</HintPath>
+    </Reference>
+    <Reference Include="AsmResolver.PE">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\core\AsmResolver.PE.dll</HintPath>
+    </Reference>
+    <Reference Include="AsmResolver.PE.File">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\core\AsmResolver.PE.File.dll</HintPath>
+    </Reference>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Assembly-CSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="Assembly-CSharp-firstpass">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Assembly-CSharp-firstpass.dll</HintPath>
+    </Reference>
+    <Reference Include="AssetRipper.CIL">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\core\AssetRipper.CIL.dll</HintPath>
+    </Reference>
+    <Reference Include="AssetRipper.Primitives">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\core\AssetRipper.Primitives.dll</HintPath>
+    </Reference>
+    <Reference Include="BepInEx.Core">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\core\BepInEx.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="BepInEx.Preloader.Core">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\core\BepInEx.Preloader.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="BepInEx.Unity.Common">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\core\BepInEx.Unity.Common.dll</HintPath>
+    </Reference>
+    <Reference Include="BepInEx.Unity.IL2CPP">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\core\BepInEx.Unity.IL2CPP.dll</HintPath>
+    </Reference>
+    <Reference Include="Catapult.Core">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Catapult.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="Catapult.Modules.Items.Protocol">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Catapult.Modules.Items.Protocol.dll</HintPath>
+    </Reference>
+    <Reference Include="Catapult.Protocol">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Catapult.Protocol.dll</HintPath>
+    </Reference>
+    <Reference Include="Catapult.Services.Gateway.Protocol.Client">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Catapult.Services.Gateway.Protocol.Client.dll</HintPath>
+    </Reference>
+    <Reference Include="Catapult.Services.Login.Protocol.Client">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Catapult.Services.Login.Protocol.Client.dll</HintPath>
+    </Reference>
+    <Reference Include="Cinemachine">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Cinemachine.dll</HintPath>
+    </Reference>
+    <Reference Include="CMS_Runtime">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\CMS_Runtime.dll</HintPath>
+    </Reference>
+    <Reference Include="Coffee.UIParticle">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Coffee.UIParticle.dll</HintPath>
+    </Reference>
+    <Reference Include="com.Epic.OnlineServices">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\com.Epic.OnlineServices.dll</HintPath>
+    </Reference>
+    <Reference Include="com.playeveryware.eos">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\com.playeveryware.eos.dll</HintPath>
+    </Reference>
+    <Reference Include="com.playeveryware.eos.core">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\com.playeveryware.eos.core.dll</HintPath>
+    </Reference>
+    <Reference Include="Cpp2IL.Core">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\core\Cpp2IL.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="DeviceIO">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\DeviceIO.dll</HintPath>
+    </Reference>
+    <Reference Include="Disarm">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\core\Disarm.dll</HintPath>
+    </Reference>
+    <Reference Include="DOTween">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\DOTween.dll</HintPath>
+    </Reference>
+    <Reference Include="DOTween.Modules">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\DOTween.Modules.dll</HintPath>
+    </Reference>
+    <Reference Include="EOS.K3S">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\EOS.K3S.dll</HintPath>
+    </Reference>
+    <Reference Include="FallGuys.Client.Protocol">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\FallGuys.Client.Protocol.dll</HintPath>
+    </Reference>
+    <Reference Include="FallGuys.Common.Debug.Protocol.Client">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\FallGuys.Common.Debug.Protocol.Client.dll</HintPath>
+    </Reference>
+    <Reference Include="FallGuys.Common.Targeting.Protocol.Client">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\FallGuys.Common.Targeting.Protocol.Client.dll</HintPath>
+    </Reference>
+    <Reference Include="FallGuys.Gateway.Protocol.Client">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\FallGuys.Gateway.Protocol.Client.dll</HintPath>
+    </Reference>
+    <Reference Include="FallGuys.GeneratedProtocol">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\FallGuys.GeneratedProtocol.dll</HintPath>
+    </Reference>
+    <Reference Include="FallGuys.Level.Protocol.AuthTokens">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\FallGuys.Level.Protocol.AuthTokens.dll</HintPath>
+    </Reference>
+    <Reference Include="FallGuys.Lobby.Protocol.Client">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\FallGuys.Lobby.Protocol.Client.dll</HintPath>
+    </Reference>
+    <Reference Include="FallGuys.Lobby.Protocol.Common">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\FallGuys.Lobby.Protocol.Common.dll</HintPath>
+    </Reference>
+    <Reference Include="FallGuys.Match.Protocol.Client">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\FallGuys.Match.Protocol.Client.dll</HintPath>
+    </Reference>
+    <Reference Include="FallGuys.Player.Protocol.Client">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\FallGuys.Player.Protocol.Client.dll</HintPath>
+    </Reference>
+    <Reference Include="FallGuys.Scheduling.Config">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\FallGuys.Scheduling.Config.dll</HintPath>
+    </Reference>
+    <Reference Include="FallGuys.Scheduling.Resolution">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\FallGuys.Scheduling.Resolution.dll</HintPath>
+    </Reference>
+    <Reference Include="FallGuys.Store.Protocol.Client">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\FallGuys.Store.Protocol.Client.dll</HintPath>
+    </Reference>
+    <Reference Include="FallGuysLib">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\plugins\BetterFG\FallGuysLib.dll</HintPath>
+    </Reference>
+    <Reference Include="FMODUnity">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\FMODUnity.dll</HintPath>
+    </Reference>
+    <Reference Include="FMODUnityResonance">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\FMODUnityResonance.dll</HintPath>
+    </Reference>
+    <Reference Include="Gee.External.Capstone">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\core\Gee.External.Capstone.dll</HintPath>
+    </Reference>
+    <Reference Include="Hazel">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Hazel.dll</HintPath>
+    </Reference>
+    <Reference Include="Iced">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\core\Iced.dll</HintPath>
+    </Reference>
+    <Reference Include="Il2CppInterop.Common">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\core\Il2CppInterop.Common.dll</HintPath>
+    </Reference>
+    <Reference Include="Il2CppInterop.Generator">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\core\Il2CppInterop.Generator.dll</HintPath>
+    </Reference>
+    <Reference Include="Il2CppInterop.HarmonySupport">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\core\Il2CppInterop.HarmonySupport.dll</HintPath>
+    </Reference>
+    <Reference Include="Il2CppInterop.Runtime">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\core\Il2CppInterop.Runtime.dll</HintPath>
+    </Reference>
+    <Reference Include="Il2CppMono.Security">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Il2CppMono.Security.dll</HintPath>
+    </Reference>
+    <Reference Include="Il2Cppmscorlib">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Il2Cppmscorlib.dll</HintPath>
+    </Reference>
+    <Reference Include="Il2CppSystem">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Il2CppSystem.dll</HintPath>
+    </Reference>
+    <Reference Include="Il2CppSystem.Configuration">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Il2CppSystem.Configuration.dll</HintPath>
+    </Reference>
+    <Reference Include="Il2CppSystem.Core">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Il2CppSystem.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="Il2CppSystem.Data">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Il2CppSystem.Data.dll</HintPath>
+    </Reference>
+    <Reference Include="Il2CppSystem.Drawing">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Il2CppSystem.Drawing.dll</HintPath>
+    </Reference>
+    <Reference Include="Il2CppSystem.Net.Http">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Il2CppSystem.Net.Http.dll</HintPath>
+    </Reference>
+    <Reference Include="Il2CppSystem.Numerics">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Il2CppSystem.Numerics.dll</HintPath>
+    </Reference>
+    <Reference Include="Il2CppSystem.Runtime.Serialization">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Il2CppSystem.Runtime.Serialization.dll</HintPath>
+    </Reference>
+    <Reference Include="Il2CppSystem.Xml">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Il2CppSystem.Xml.dll</HintPath>
+    </Reference>
+    <Reference Include="Il2CppSystem.Xml.Linq">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Il2CppSystem.Xml.Linq.dll</HintPath>
+    </Reference>
+    <Reference Include="io.sentry.unity.runtime">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\io.sentry.unity.runtime.dll</HintPath>
+    </Reference>
+    <Reference Include="LibCpp2IL">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\core\LibCpp2IL.dll</HintPath>
+    </Reference>
+    <Reference Include="Mediatonic.Automation.FallGuys">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Mediatonic.Automation.FallGuys.dll</HintPath>
+    </Reference>
+    <Reference Include="Mediatonic.Benchmarking">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Mediatonic.Benchmarking.dll</HintPath>
+    </Reference>
+    <Reference Include="Mediatonic.Catapult.ClientSdk.Runtime">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Mediatonic.Catapult.ClientSdk.Runtime.dll</HintPath>
+    </Reference>
+    <Reference Include="Mediatonic.CommandLineUtils">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Mediatonic.CommandLineUtils.dll</HintPath>
+    </Reference>
+    <Reference Include="Mediatonic.ErrorMonitor">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Mediatonic.ErrorMonitor.dll</HintPath>
+    </Reference>
+    <Reference Include="Mediatonic.Pooling">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Mediatonic.Pooling.dll</HintPath>
+    </Reference>
+    <Reference Include="Mediatonic.Strings">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Mediatonic.Strings.dll</HintPath>
+    </Reference>
+    <Reference Include="MiniJson_Runtime">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\MiniJson_Runtime.dll</HintPath>
+    </Reference>
+    <Reference Include="Mono.Cecil">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\core\Mono.Cecil.dll</HintPath>
+    </Reference>
+    <Reference Include="Mono.Cecil.Mdb">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\core\Mono.Cecil.Mdb.dll</HintPath>
+    </Reference>
+    <Reference Include="Mono.Cecil.Pdb">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\core\Mono.Cecil.Pdb.dll</HintPath>
+    </Reference>
+    <Reference Include="Mono.Cecil.Rocks">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\core\Mono.Cecil.Rocks.dll</HintPath>
+    </Reference>
+    <Reference Include="MonoMod.Backports">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\core\MonoMod.Backports.dll</HintPath>
+    </Reference>
+    <Reference Include="MonoMod.ILHelpers">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\core\MonoMod.ILHelpers.dll</HintPath>
+    </Reference>
+    <Reference Include="MonoMod.RuntimeDetour">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\core\MonoMod.RuntimeDetour.dll</HintPath>
+    </Reference>
+    <Reference Include="MonoMod.Utils">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\core\MonoMod.Utils.dll</HintPath>
+    </Reference>
+    <Reference Include="MPG.PreInit.Config">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\MPG.PreInit.Config.dll</HintPath>
+    </Reference>
+    <Reference Include="MT.FGClient">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\MT.FGClient.dll</HintPath>
+    </Reference>
+    <Reference Include="MTLog">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\MTLog.dll</HintPath>
+    </Reference>
+    <Reference Include="MTNetwork">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\MTNetwork.dll</HintPath>
+    </Reference>
+    <Reference Include="mvvmbindings">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\mvvmbindings.dll</HintPath>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="OEBIF">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\OEBIF.dll</HintPath>
+    </Reference>
+    <Reference Include="ParsingUtils_Runtime">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\ParsingUtils_Runtime.dll</HintPath>
+    </Reference>
+    <Reference Include="protobuf-net">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\protobuf-net.dll</HintPath>
+    </Reference>
+    <Reference Include="RemoteImages">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\RemoteImages.dll</HintPath>
+    </Reference>
+    <Reference Include="Rewired_Core">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Rewired_Core.dll</HintPath>
+    </Reference>
+    <Reference Include="Rewired_Windows">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Rewired_Windows.dll</HintPath>
+    </Reference>
+    <Reference Include="SemanticVersioning">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\core\SemanticVersioning.dll</HintPath>
+    </Reference>
+    <Reference Include="Sentry">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Sentry.dll</HintPath>
+    </Reference>
+    <Reference Include="Sentry.Microsoft.Bcl.AsyncInterfaces">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Sentry.Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
+    </Reference>
+    <Reference Include="Sentry.System.Buffers">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Sentry.System.Buffers.dll</HintPath>
+    </Reference>
+    <Reference Include="Sentry.System.Collections.Immutable">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Sentry.System.Collections.Immutable.dll</HintPath>
+    </Reference>
+    <Reference Include="Sentry.System.Memory">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Sentry.System.Memory.dll</HintPath>
+    </Reference>
+    <Reference Include="Sentry.System.Numerics.Vectors">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Sentry.System.Numerics.Vectors.dll</HintPath>
+    </Reference>
+    <Reference Include="Sentry.System.Reflection.Metadata">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Sentry.System.Reflection.Metadata.dll</HintPath>
+    </Reference>
+    <Reference Include="Sentry.System.Runtime.CompilerServices.Unsafe">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Sentry.System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+    </Reference>
+    <Reference Include="Sentry.System.Text.Encodings.Web">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Sentry.System.Text.Encodings.Web.dll</HintPath>
+    </Reference>
+    <Reference Include="Sentry.System.Text.Json">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Sentry.System.Text.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="Sentry.System.Threading.Tasks.Extensions">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Sentry.System.Threading.Tasks.Extensions.dll</HintPath>
+    </Reference>
+    <Reference Include="Sentry.Unity">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Sentry.Unity.dll</HintPath>
+    </Reference>
+    <Reference Include="Sentry.Unity.Native">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Sentry.Unity.Native.dll</HintPath>
+    </Reference>
+    <Reference Include="spine-unity">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\spine-unity.dll</HintPath>
+    </Reference>
+    <Reference Include="SplineEditor">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\SplineEditor.dll</HintPath>
+    </Reference>
+    <Reference Include="StableNameDotNet">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\core\StableNameDotNet.dll</HintPath>
+    </Reference>
+    <Reference Include="TheMultiplayerGuys.FGCommon">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\TheMultiplayerGuys.FGCommon.dll</HintPath>
+    </Reference>
+    <Reference Include="TheMultiplayerGuys.Utility">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\TheMultiplayerGuys.Utility.dll</HintPath>
+    </Reference>
+    <Reference Include="TonicSounds">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\TonicSounds.dll</HintPath>
+    </Reference>
+    <Reference Include="TonicSoundsFMOD">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\TonicSoundsFMOD.dll</HintPath>
+    </Reference>
+    <Reference Include="TonicTools">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\TonicTools.dll</HintPath>
+    </Reference>
+    <Reference Include="TouchInputLayoutsGuard">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\TouchInputLayoutsGuard.dll</HintPath>
+    </Reference>
+    <Reference Include="TweenTool">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\TweenTool.dll</HintPath>
+    </Reference>
+    <Reference Include="UniRx">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UniRx.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.Addressables">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Unity.Addressables.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.Burst">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Unity.Burst.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.Burst.Unsafe">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Unity.Burst.Unsafe.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.Collections">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Unity.Collections.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.Collections.LowLevel.ILSupport">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Unity.Collections.LowLevel.ILSupport.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.InputSystem">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Unity.InputSystem.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.Localization">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Unity.Localization.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.Mathematics">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Unity.Mathematics.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.MemoryProfiler">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Unity.MemoryProfiler.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.Postprocessing.Runtime">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Unity.Postprocessing.Runtime.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.Profiling.Core">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Unity.Profiling.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.ResourceManager">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Unity.ResourceManager.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.TextMeshPro">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Unity.TextMeshPro.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.Timeline">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Unity.Timeline.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.ucg.QoS">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Unity.ucg.QoS.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.AccessibilityModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.AccessibilityModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.AIModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.AIModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.AndroidJNIModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.AndroidJNIModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.AnimationModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.AnimationModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.AssetBundleModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.AssetBundleModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.AudioModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.AudioModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.ClothModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.ClothModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.ClusterInputModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.ClusterInputModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.ClusterRendererModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.ClusterRendererModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.ContentLoadModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.ContentLoadModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.CoreModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.CrashReportingModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.CrashReportingModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.DirectorModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.DirectorModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.DSPGraphModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.DSPGraphModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.GameCenterModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.GameCenterModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.GIModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.GIModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.GridModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.GridModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.HotReloadModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.HotReloadModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.ImageConversionModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.ImageConversionModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.IMGUIModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.InputLegacyModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.InputLegacyModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.InputModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.InputModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.JSONSerializeModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.JSONSerializeModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.LocalizationModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.LocalizationModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.ParticleSystemModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.ParticleSystemModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.PerformanceReportingModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.PerformanceReportingModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.Physics2DModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.Physics2DModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.PhysicsModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.PhysicsModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.ProfilerModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.ProfilerModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.PropertiesModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.PropertiesModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.RuntimeInitializeOnLoadManagerInitializerModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.RuntimeInitializeOnLoadManagerInitializerModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.ScreenCaptureModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.ScreenCaptureModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.SharedInternalsModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.SharedInternalsModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.SpriteMaskModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.SpriteMaskModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.SpriteShapeModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.SpriteShapeModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.StreamingModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.StreamingModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.SubstanceModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.SubstanceModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.SubsystemsModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.SubsystemsModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.TerrainModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.TerrainModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.TerrainPhysicsModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.TerrainPhysicsModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.TextCoreFontEngineModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.TextCoreFontEngineModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.TextCoreTextEngineModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.TextCoreTextEngineModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.TextRenderingModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.TextRenderingModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.TilemapModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.TilemapModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.TLSModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.TLSModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.UI.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UIElementsModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.UIElementsModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UIModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.UIModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UmbraModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.UmbraModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UnityAnalyticsCommonModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.UnityAnalyticsCommonModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UnityAnalyticsModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.UnityAnalyticsModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UnityConnectModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.UnityConnectModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UnityCurlModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.UnityCurlModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UnityTestProtocolModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.UnityTestProtocolModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UnityWebRequestAssetBundleModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.UnityWebRequestAssetBundleModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UnityWebRequestAudioModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.UnityWebRequestAudioModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UnityWebRequestModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.UnityWebRequestModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UnityWebRequestTextureModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.UnityWebRequestTextureModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UnityWebRequestWWWModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.UnityWebRequestWWWModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.VehiclesModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.VehiclesModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.VFXModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.VFXModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.VideoModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.VideoModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.VirtualTexturingModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.VirtualTexturingModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.VRModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.VRModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.WindModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.WindModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.XRModule">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\UnityEngine.XRModule.dll</HintPath>
+    </Reference>
+    <Reference Include="WasmDisassembler">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\core\WasmDisassembler.dll</HintPath>
+    </Reference>
+    <Reference Include="Wushu.AsyncFileIO.Runtime">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Wushu.AsyncFileIO.Runtime.dll</HintPath>
+    </Reference>
+    <Reference Include="Wushu.LevelEditor.Runtime">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\Wushu.LevelEditor.Runtime.dll</HintPath>
+    </Reference>
+    <Reference Include="__Generated">
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\interop\__Generated.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>

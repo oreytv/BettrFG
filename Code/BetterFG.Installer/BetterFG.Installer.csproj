@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>BettrFG.Installer</AssemblyName>
+    <RootNamespace>BetterFG.Installer</RootNamespace>
+    <Product>$(BettrFGInstallerName)</Product>
+    <Version>$(BettrFGVersion)</Version>
+    <AssemblyVersion>$(BettrFGVersion)</AssemblyVersion>
+    <FileVersion>$(BettrFGVersion)</FileVersion>
+    <InformationalVersion>$(BettrFGVersion)</InformationalVersion>
+    <AssemblyTitle>$(BettrFGInstallerName)</AssemblyTitle>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <ApplicationHighDpiMode>DpiUnaware</ApplicationHighDpiMode>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Remove="assets\\betterfg.ico" />
+    <None Remove="assets\button_shine_pinkbg.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="assets\\betterfg.ico" />
+    <EmbeddedResource Include="assets\button_shine_pinkbg.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="..\BetterFG\assets\ui\general\button.png" Link="assets\ui\general\button.png" />
+    <EmbeddedResource Include="..\BetterFG\assets\ui\general\button_shine.png" Link="assets\ui\general\button_shine.png" />
+    <EmbeddedResource Include="..\BetterFG\assets\ui\general\radialgradcorner128.png" Link="assets\ui\general\radialgradcorner128.png" />
+    <EmbeddedResource Include="..\BetterFG\assets\ui\windows\generalbg.png" Link="assets\ui\windows\generalbg.png" />
+    <EmbeddedResource Include="..\BetterFG\assets\ui\windows\generalbg_hover.png" Link="assets\ui\windows\generalbg_hover.png" />
+    <EmbeddedResource Include="..\BetterFG\assets\ui\betterfglogo.png" Link="assets\ui\betterfglogo.png" />
+  </ItemGroup>
+</Project>

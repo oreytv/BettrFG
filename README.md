@@ -9,9 +9,16 @@
 </p>
 
 
-# BettrFG Releases
+# BettrFG
 
-This repo holds the installer for BettrFG, the Fall Guys mod that aims to make the Fall Guys experience more fun using custom QoL features and UGC customization
+This repo holds the installer and source for BettrFG, the Fall Guys mod that aims to make the Fall Guys experience more fun using custom QoL features and UGC customization
+
+## Source code
+
+> [!WARNING]
+> The **Profiles** feature is intentionally left out of this repository. Its source files are excluded, and the code you get here does not build with it. Don't ask for it or try to add it back.
+>
+> I also have not provided the code required to patch the game's anti-cheat and platform spoofing. I know it's easy to obtain. But I'm trying my best lol
 
 ### Discord server:
 http://dsc.gg/bettrfg
@@ -33,14 +40,14 @@ http://dsc.gg/bettrfg
 # Contribution
 
 Programming, most implementations:
-- oreytv (oreyre)
+- oreyre9000 (oreytv)
 
 Programming help, code snippets, general ideas and features:
 - [Floyzi](https://x.com/floyzi102)
 
   
 UI:
-- oreytv (oreyre)
+- oreyre9000 (oreytv)
 
 Audio:
 - Persona 5 UI sfx
