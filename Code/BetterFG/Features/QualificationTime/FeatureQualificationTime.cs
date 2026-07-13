@@ -1367,7 +1367,11 @@ namespace BetterFG.Features.QualificationTime
         {
             int idx = 0;
             bool finished = false;
+            Vector3 prevPos = Vector3.zero;
+            bool havePrevPos = false;
             int lastState = 0;
+            int driftFrames = 0;
+            int driftIdx = -1;
             while (ghostGo != null && _ghostGos.Contains(ghostGo) && idx < frames.Count)
             {
                 float elapsed = GlobalGameStateClient.Instance?.GameStateView != null
@@ -1391,13 +1395,22 @@ namespace BetterFG.Features.QualificationTime
                 }
                 if (ghostAnim != null)
                 {
-                    // only when the RECORDING changes state. comparing against the animator's actual state
-                    // instead meant every transition it made on its own counted as a mismatch, so we yanked
-                    // it back and restarted the clip every few frames through a slide
+                    // Play on a recorded state change, and re-assert if the graph drifts off and stays off.
+                    // the 4-frame delay avoids stomping short transitions, which restarts the slide clip
                     if (frames[idx].stateHash != lastState)
                     {
                         lastState = frames[idx].stateHash;
                         ghostAnim.Play(lastState, 0, 0f);
+                        driftFrames = 0;
+                    }
+                    else if (idx != driftIdx)
+                    {
+                        driftIdx = idx;
+                        if (ghostAnim.GetCurrentAnimatorStateInfo(0).shortNameHash != lastState)
+                        {
+                            if (++driftFrames >= 4) { ghostAnim.Play(lastState, 0, 0f); driftFrames = 0; }
+                        }
+                        else driftFrames = 0;
                     }
 
                     float r = FallGuysCharacterController.GroundCheckSphereCastRadius;
@@ -1408,19 +1421,22 @@ namespace BetterFG.Features.QualificationTime
                     ghostAnim.SetFloat(FallGuysCharacterController.slopeAngleParam,
                         grounded ? Vector3.Angle(hit.normal, Vector3.up) : 0f);
 
-                    // GameplayTimeElapsed is replicated, so neighbouring frames share a timestamp often
-                    // enough that a dt=0 zero velocity would snap the ghost to idle mid-stride
-                    float dt = idx + 1 < frames.Count ? frames[idx + 1].t - frames[idx].t : 0f;
-                    if (dt > 0f)
+                    // velocity from the ghost's own per-frame movement, not the recorded frame pair whose
+                    // replicated timestamps often match and give dt=0. zVel is XZ speed magnitude, not the
+                    // facing-forward component, which collapsed to ~0 when the bean moved off its facing
+                    Vector3 pos = ghostGo.transform.position;
+                    if (Time.deltaTime > 0f && havePrevPos)
                     {
-                        Vector3 v = (frames[idx + 1].pos - frames[idx].pos) / dt;
-                        Vector3 local = Quaternion.Inverse(frames[idx].rot) * new Vector3(v.x, 0f, v.z);
+                        Vector3 v = (pos - prevPos) / Time.deltaTime;
+                        Vector3 local = Quaternion.Inverse(ghostGo.transform.rotation) * new Vector3(v.x, 0f, v.z);
                         float mod = FallGuysCharacterController.AnimationVelocityParamModifier;
-                        ghostAnim.SetFloat(FallGuysCharacterController.zVelParam, local.z * mod);
+                        ghostAnim.SetFloat(FallGuysCharacterController.zVelParam, new Vector2(v.x, v.z).magnitude * mod);
                         ghostAnim.SetFloat(FallGuysCharacterController.xVelParam, local.x * mod);
                         ghostAnim.SetFloat(FallGuysCharacterController.yVelParam, v.y * mod);
                         ghostAnim.SetFloat(FallGuysCharacterController.airOnlyYVelParam, grounded ? 0f : v.y * mod);
                     }
+                    prevPos = pos;
+                    havePrevPos = true;
                 }
                 yield return null;
             }
