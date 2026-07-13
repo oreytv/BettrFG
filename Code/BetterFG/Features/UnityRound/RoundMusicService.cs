@@ -60,9 +60,12 @@ namespace BetterFG.Features.UnityRound
             if (_pendingBytes == null) return;
             if (_playing) Stop();
 
+            var bytes = _pendingBytes;
+            _pendingBytes = null;   // consume it — otherwise the same song replays every round that skips the download path
+
             try
             {
-                _ms = new MemoryStream(_pendingBytes);
+                _ms = new MemoryStream(bytes);
                 _reader = new Mp3FileReader(_ms);
                 _loop = new LoopStream(_reader);
                 _vol = new VolumeWaveProvider16(_loop) { Volume = CurrentVolume() };
