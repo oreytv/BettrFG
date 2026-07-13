@@ -239,47 +239,44 @@ namespace BetterFG.Nametag
                     for (int i = 0; i < vms.Length; i++)
                         HandleViewModel(vms[i], null);
 
-                // only the two HUDs that actually hold remote-nametag rows, instead of a whole-scene
-                // FindObjectsOfType<PlayerInfoHUDBase>(true) every poll.
-                foreach (var hudPath in new[]
-                {
-                    "----------------CAMERAS/LevelCameras_LevelEditor/Main Camera Brain/PlayerInfoHUD",
-                    "UICanvas_Client_V2(Clone)/Default/InGameUiManager(Clone)/PersistentUnderlayUI/PB_InfoHUD/Parent",
-                })
-                {
-                    var hudGo = GameObject.Find(hudPath);
-                    var hudBase = hudGo != null ? hudGo.GetComponentInChildren<PlayerInfoHUDBase>(true) : null;
-                    var spawned = hudBase?._spawnedInfoObjects;
-                    if (spawned == null) continue;
+                // the local tag resolves the in-round HUD mode-agnostically (CAMERAS root + LevelCameras_
+                // prefix, or the canvas PB_InfoHUD), so walk up from it to the HUD that holds every bean row
+                // instead of re-hardcoding paths that only matched the UGC editor rig.
+                var hudBase = NametagFinder.FindLocalNameTagSprite()?.GetComponentInParent<PlayerInfoHUDBase>();
+                var spawned = hudBase?._spawnedInfoObjects;
+                if (spawned == null) return;
 
-                    for (int i = 0; i < spawned.Count; i++)
+                for (int i = 0; i < spawned.Count; i++)
+                {
+                    var row = spawned[i];
+                    var display = row?.playerInfo;
+                    if (display == null) continue;
+
+                    string key = row.fgcc != null ? BeanNetworkUtil.TryGetPlayerKeyForBean(row.fgcc.gameObject) : "";
+                    var profile = RemoteProfileStore.TryGet(key);
+                    var tmp = NametagIconApplicator.TryGetNameText(display);
+                    if (profile?.nametag == null && tmp != null)
                     {
-                        var row = spawned[i];
-                        var display = row?.playerInfo;
-                        if (display == null) continue;
-
-                        string key = row.fgcc != null ? BeanNetworkUtil.TryGetPlayerKeyForBean(row.fgcc.gameObject) : "";
-                        var profile = RemoteProfileStore.TryGet(key);
-                        var tmp = NametagIconApplicator.TryGetNameText(display);
-                        if (profile?.nametag == null && tmp != null)
-                            profile = RemoteProfileStore.TryGet(tmp.text);
-                        // font replacement is independent of profiles — a profile-less player still gets the
-                        // custom font. apply it here too so HUD rows that never hit a NameTagViewModel (3D
-                        // world tags) aren't left on the game font.
+                        profile = RemoteProfileStore.TryGet(tmp.text);
                         if (profile?.nametag == null)
-                        {
-                            if (tmp != null) FontReplacementService.ApplyToNametag(tmp);
-                            continue;
-                        }
-
-                        var info = profile.nametag;
-                        NametagIconApplicator.ApplyRemoteToDisplay(display, tmp != null ? tmp.text : "", info);
-                        NametagIconApplicator.ApplyBacking(display.transform, !string.IsNullOrEmpty(info.backingPath), info.backingPath,
-                            info.backingOffX, info.backingOffY, info.backingScale <= 0f ? 1f : info.backingScale);
-                        NametagIconApplicator.ApplyNickname(display.transform, party: false, !string.IsNullOrEmpty(info.nickname), info.nickname);
-                        if (info.platformHide == "true" || !string.IsNullOrEmpty(info.platformCustom))
-                            NametagIconApplicator.ApplyPlatformIcon(display.gameObject, info.platformHide == "true", info.platformCustom ?? "");
+                            profile = RemoteProfileStore.TryGet(System.Text.RegularExpressions.Regex.Replace(tmp.text ?? "", "<[^>]*>", "").Trim());
                     }
+                    // font replacement is independent of profiles — a profile-less player still gets the
+                    // custom font. apply it here too so HUD rows that never hit a NameTagViewModel (3D
+                    // world tags) aren't left on the game font.
+                    if (profile?.nametag == null)
+                    {
+                        if (tmp != null) FontReplacementService.ApplyToNametag(tmp);
+                        continue;
+                    }
+
+                    var info = profile.nametag;
+                    NametagIconApplicator.ApplyRemoteToDisplay(display, tmp != null ? tmp.text : "", info);
+                    NametagIconApplicator.ApplyBacking(display.transform, !string.IsNullOrEmpty(info.backingPath), info.backingPath,
+                        info.backingOffX, info.backingOffY, info.backingScale <= 0f ? 1f : info.backingScale);
+                    NametagIconApplicator.ApplyNickname(display.transform, party: false, !string.IsNullOrEmpty(info.nickname), info.nickname);
+                    if (info.platformHide == "true" || !string.IsNullOrEmpty(info.platformCustom))
+                        NametagIconApplicator.ApplyPlatformIcon(display.gameObject, info.platformHide == "true", info.platformCustom ?? "");
                 }
             }
             catch (System.Exception ex)
