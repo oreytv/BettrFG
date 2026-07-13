@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
@@ -173,13 +173,13 @@ namespace BetterFG.Services
                 if (!File.Exists(FilePath) && File.Exists(OldFilePath))
                 {
                     File.Copy(OldFilePath, FilePath, false);
-                    Debug.Log("[Settings] moved last.txt to appdata");
+                    Plugin.Log.LogInfo("Settings: moved last.txt to appdata");
                 }
 
                 if (!File.Exists(PbFilePath) && File.Exists(OldPbFilePath))
                 {
                     File.Copy(OldPbFilePath, PbFilePath, false);
-                    Debug.Log("[Settings] moved pb.txt to appdata");
+                    Plugin.Log.LogInfo("Settings: moved pb.txt to appdata");
                 }
 
                 if (BackupEnabled) BackupNow("startup");
@@ -187,7 +187,7 @@ namespace BetterFG.Services
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[Settings] Init failed: {ex.Message}");
+                Plugin.Log.LogError($"Settings: Init failed: {ex.Message}");
             }
         }
 
@@ -234,7 +234,7 @@ namespace BetterFG.Services
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[Settings] backup ({reason}) failed: {ex.Message}");
+                Plugin.Log.LogWarning($"Settings: backup ({reason}) failed: {ex.Message}");
             }
         }
 
@@ -261,7 +261,7 @@ namespace BetterFG.Services
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[Settings] Load failed: {ex.Message}");
+                Plugin.Log.LogError($"Settings: Load failed: {ex.Message}");
             }
         }
 
@@ -281,7 +281,7 @@ namespace BetterFG.Services
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[Settings] Save failed: {ex.Message}");
+                Plugin.Log.LogError($"Settings: Save failed: {ex.Message}");
             }
         }
 
@@ -308,7 +308,7 @@ namespace BetterFG.Services
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[Settings] PB load failed: {ex.Message}");
+                Plugin.Log.LogError($"Settings: PB load failed: {ex.Message}");
             }
         }
 
@@ -328,7 +328,7 @@ namespace BetterFG.Services
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[Settings] PB save failed: {ex.Message}");
+                Plugin.Log.LogError($"Settings: PB save failed: {ex.Message}");
             }
         }
 
@@ -357,7 +357,7 @@ namespace BetterFG.Services
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[Settings] SkinScale load failed: {ex.Message}");
+                Plugin.Log.LogError($"Settings: SkinScale load failed: {ex.Message}");
             }
         }
 
@@ -378,7 +378,7 @@ namespace BetterFG.Services
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[Settings] SkinScale save failed: {ex.Message}");
+                Plugin.Log.LogError($"Settings: SkinScale save failed: {ex.Message}");
             }
         }
     }

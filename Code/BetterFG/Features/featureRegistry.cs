@@ -7,9 +7,9 @@ using BetterFG.Features.TimePlacement;
 
 namespace BetterFG.Features
 {
-    public static class featureRegistry
+    public static class FeatureRegistry
     {
-        static readonly List<bfgfeature> _all = new List<bfgfeature>
+        static readonly List<BfgFeature> _all = new List<BfgFeature>
         {
             FeatureQualificationTime.feature,
             FeatureStars.feature,
@@ -18,9 +18,9 @@ namespace BetterFG.Features
             //FeatureAllCosmetics.feature
         };
 
-        public static IReadOnlyList<bfgfeature> all => _all;
+        public static IReadOnlyList<BfgFeature> all => _all;
 
-        public static bfgfeature Find(string id)
+        public static BfgFeature Find(string id)
         {
             for (int i = 0; i < _all.Count; i++)
                 if (_all[i].id == id) return _all[i];

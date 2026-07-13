@@ -1,4 +1,4 @@
-using LevelEditor;
+﻿using LevelEditor;
 
 namespace BetterFG.UI.Windows.Creative
 {
@@ -14,7 +14,7 @@ namespace BetterFG.UI.Windows.Creative
         private static int Apply(bool slime)
         {
             var sel = LevelEditorMultiSelectionHandler.Selection();
-            if (sel == null) { Plugin.Log.LogWarning("[BatchMaterial] no selection"); return 0; }
+            if (sel == null) { Plugin.Log.LogWarning("BatchMaterial: no selection"); return 0; }
 
             var entry = BatchEditHistory.Begin(slime ? "material slime" : "material none");
             int touched = 0, noParam = 0, noSlime = 0;
@@ -41,7 +41,7 @@ namespace BetterFG.UI.Windows.Creative
                 touched++;
             }
             BatchEditHistory.Push(entry);
-            Plugin.Log.LogInfo($"[BatchMaterial] {(slime ? "slime" : "none")} -> {touched} set, {noParam} no-surface-param, {noSlime} no-slime-option");
+            Plugin.Log.LogInfo($"BatchMaterial: {(slime ? "slime" : "none")} -> {touched} set, {noParam} no-surface-param, {noSlime} no-slime-option");
             return touched;
         }
 
@@ -53,7 +53,7 @@ namespace BetterFG.UI.Windows.Creative
             var col = surf._enabledSurfaces;
             var names = LevelEditorSurfaceDefinitionParameter._enabledSurfaceNames;
             int count = names != null ? names.Count : 0;
-            if (col == null || count == 0) { Plugin.Log.LogInfo("[BatchMaterial] no enabled surfaces"); return -1; }
+            if (col == null || count == 0) { Plugin.Log.LogInfo("BatchMaterial: no enabled surfaces"); return -1; }
 
             for (int i = 0; i < count; i++)
             {
@@ -68,7 +68,7 @@ namespace BetterFG.UI.Windows.Creative
 
             var joined = string.Empty;
             for (int i = 0; i < count; i++) joined += (i > 0 ? ", " : "") + i + ":" + names[i];
-            Plugin.Log.LogInfo("[BatchMaterial] slime not found in enabled surfaces: " + joined);
+            Plugin.Log.LogInfo("BatchMaterial: slime not found in enabled surfaces: " + joined);
             return -1;
         }
     }

@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using LevelEditor;
 
 namespace BetterFG.UI.Windows.Creative
@@ -136,7 +136,7 @@ namespace BetterFG.UI.Windows.Creative
             if (refreshResponders)
             {
                 try { surf.OnParameterIndexChanged(index); }
-                catch (System.Exception ex) { Plugin.Log.LogWarning("[BatchMaterial] OnParameterIndexChanged failed: " + ex.Message); }
+                catch (System.Exception ex) { Plugin.Log.LogWarning("BatchMaterial: OnParameterIndexChanged failed: " + ex.Message); }
             }
         }
     }

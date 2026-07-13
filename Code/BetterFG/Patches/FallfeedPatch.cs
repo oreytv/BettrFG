@@ -143,7 +143,7 @@ namespace BetterFG.Patches
             FallFeedQualTimeTweak.Instance?.Apply(__instance);
         }
 
-        private static bool HasNameStyle(remoteNametagInfo info)
+        private static bool HasNameStyle(RemoteNametagInfo info)
         {
             if (info == null) return false;
             return info.bold || info.italic || !string.IsNullOrEmpty(info.nameStyle) ||

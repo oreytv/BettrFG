@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -37,20 +37,20 @@ namespace BetterFG.Features.QualificationTime
 {
     internal class FeatureQualificationTime
     {
-        public static readonly bfgfeature feature = new bfgfeature("pb", "Personal Bests", true, new List<featuresetting>
+        public static readonly BfgFeature feature = new BfgFeature("pb", "Personal Bests", true, new List<FeatureSetting>
         {
-            new featuresetting { id = "store", label = "Store PBs", defaultOn = true },
-            new featuresetting { id = "qual", label = "Show PB on qual", defaultOn = true },
-            new featuresetting { id = "loadscreen", label = "Show PB on load screen", defaultOn = true },
-            new featuresetting { id = "play", label = "Show PB during play", defaultOn = true },
-            new featuresetting { id = "timer", label = "Show live timer", defaultOn = true },
-            new featuresetting { id = "menu", label = "Show PB button on menu", defaultOn = true },
-            new featuresetting { id = "asksave", label = "Ask to save PB", defaultOn = false },
-            new featuresetting { id = "ghost", label = "Ghost run", defaultOn = true },
+            new FeatureSetting { id = "store", label = "Store PBs", defaultOn = true },
+            new FeatureSetting { id = "qual", label = "Show PB on qual", defaultOn = true },
+            new FeatureSetting { id = "loadscreen", label = "Show PB on load screen", defaultOn = true },
+            new FeatureSetting { id = "play", label = "Show PB during play", defaultOn = true },
+            new FeatureSetting { id = "timer", label = "Show live timer", defaultOn = true },
+            new FeatureSetting { id = "menu", label = "Show PB button on menu", defaultOn = true },
+            new FeatureSetting { id = "asksave", label = "Ask to save PB", defaultOn = false },
+            new FeatureSetting { id = "ghost", label = "Ghost run", defaultOn = true },
         },
-        choices: new List<featurechoice>
+        choices: new List<FeatureChoice>
         {
-            new featurechoice
+            new FeatureChoice
             {
                 id = "ghostmode",
                 label = "Ghost run to show",
@@ -60,7 +60,7 @@ namespace BetterFG.Features.QualificationTime
             },
         });
 
-        static bool On(string setting) => BetterFG.Features.featureRegistry.IsOn("pb", setting);
+        static bool On(string setting) => BetterFG.Features.FeatureRegistry.IsOn("pb", setting);
 
         static readonly AnimationCurve dismissCurve = new AnimationCurve(
             new Keyframe(0f, 1f),
@@ -991,7 +991,7 @@ namespace BetterFG.Features.QualificationTime
         // ghosts currently in the round. usually one, but "All" mode spawns up to three.
         static readonly List<GameObject> _ghostGos = new List<GameObject>();
 
-        // ghost mode: which show's ghost(s) to play. a featurechoice on the feature, so it
+        // ghost mode: which show's ghost(s) to play. a FeatureChoice on the feature, so it
         // auto-renders as a dropdown in the features tab and stores under "feature.pb.ghostmode".
         internal static string GhostMode => feature.GetChoice("ghostmode");
 
@@ -1808,7 +1808,7 @@ namespace BetterFG.Features.QualificationTime
                 if (File.Exists(oldPath) && !File.Exists(newPath))
                     File.Move(oldPath, newPath);
             }
-            catch (Exception ex) { Debug.LogWarning($"SplashCache: rename failed: {ex.Message}"); }
+            catch (Exception ex) { Plugin.Log.LogWarning($"SplashCache: rename failed: {ex.Message}"); }
         }
 
         // keep loaded textures in memory so callers that rebuild their UI a lot (the PB tab re-renders
@@ -1832,7 +1832,7 @@ namespace BetterFG.Features.QualificationTime
                 if (tex.LoadImage(bytes)) { _texCache[cacheKey] = tex; return tex; }
                 UnityEngine.Object.Destroy(tex);
             }
-            catch (Exception ex) { Debug.LogWarning($"SplashCache: load failed for {roundId}: {ex.Message}"); }
+            catch (Exception ex) { Plugin.Log.LogWarning($"SplashCache: load failed for {roundId}: {ex.Message}"); }
             return null;
         }
 
@@ -1864,7 +1864,7 @@ namespace BetterFG.Features.QualificationTime
                 waited += 0.2f;
             }
 
-            if (srcTex == null) { Debug.LogWarning("SplashCache: sprite never loaded in 6s, bailing"); yield break; }
+            if (srcTex == null) { Plugin.Log.LogWarning("SplashCache: sprite never loaded in 6s, bailing"); yield break; }
 
             string roundId = roundIdHint;
             int lookupTries = 0;
@@ -1887,13 +1887,13 @@ namespace BetterFG.Features.QualificationTime
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogWarning($"SplashCache: round lookup try {lookupTries} failed: {ex.Message}");
+                    Plugin.Log.LogWarning($"SplashCache: round lookup try {lookupTries} failed: {ex.Message}");
                 }
 
                 if (string.IsNullOrEmpty(roundId))
                     yield return new WaitForSeconds(0.5f);
             }
-            if (string.IsNullOrEmpty(roundId)) { Debug.LogWarning("SplashCache: no roundId, bailing"); yield break; }
+            if (string.IsNullOrEmpty(roundId)) { Plugin.Log.LogWarning("SplashCache: no roundId, bailing"); yield break; }
             roundId = PBStore.CanonicalRoundId(roundId);
 
             bool isUgc = roundId.StartsWith("ugc-");
@@ -1904,7 +1904,7 @@ namespace BetterFG.Features.QualificationTime
                 if (!string.IsNullOrEmpty(dn)) cacheKey = dn;
             }
 
-            if (HasCached(cacheKey)) { Debug.Log($"SplashCache: already cached {cacheKey}"); yield break; }
+            if (HasCached(cacheKey)) { Plugin.Log.LogInfo($"SplashCache: already cached {cacheKey}"); yield break; }
 
             try
             {
@@ -1926,11 +1926,11 @@ namespace BetterFG.Features.QualificationTime
                 Directory.CreateDirectory(CacheDir);
                 string path = GetCachePath(cacheKey);
                 File.WriteAllBytes(path, jpg);
-                Debug.Log($"SplashCache: saved {cacheKey} -> {jpg.Length / 1024}kb");
+                Plugin.Log.LogInfo($"SplashCache: saved {cacheKey} -> {jpg.Length / 1024}kb");
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"SplashCache: exception: {ex.Message}");
+                Plugin.Log.LogWarning($"SplashCache: exception: {ex.Message}");
             }
         }
     }

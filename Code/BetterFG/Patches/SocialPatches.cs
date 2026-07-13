@@ -33,12 +33,12 @@ namespace BetterFG.Patches.Social
                         var opt = lookup[optionId];
                         if (opt != null && MuteSocialSoundsTweak.IsRankAudio(opt._audioEvent))
                         {
-                            Plugin.Log?.LogInfo("[muteRankSounds] skipped " + opt._audioEvent);
+                            Plugin.Log?.LogInfo("muteRankSounds: skipped " + opt._audioEvent);
                             return false;
                         }
                     }
                 }
-                catch (Exception ex) { Plugin.Log?.LogWarning("[muteRankSounds] " + ex.Message); }
+                catch (Exception ex) { Plugin.Log?.LogWarning("muteRankSounds: " + ex.Message); }
             }
 
             // creative-mode beans never register in the networked player manager, so also accept the
@@ -105,7 +105,7 @@ namespace BetterFG.Patches.Social
             }
             catch (Exception ex)
             {
-                Plugin.Log?.LogWarning("[CustomEmote] PlayEmote prefix failed: " + ex.Message);
+                Plugin.Log?.LogWarning("CustomEmote: PlayEmote prefix failed: " + ex.Message);
                 return true;
             }
         }
@@ -208,7 +208,7 @@ namespace BetterFG.Patches.Social
                 EmoteInjectionService.InjectSlots(__instance);
                 Plugin.Log.LogInfo("ts wheel beast");
             }
-            catch (Exception ex) { Debug.LogWarning("[DisplayWheel] patch failed: " + ex.Message); }
+            catch (Exception ex) { Plugin.Log.LogWarning("DisplayWheel: patch failed: " + ex.Message); }
         }
 
         // each slot VM has both a PhraseIcon and an EmoteEmojiIcon child; in-game only the last-opened
@@ -224,7 +224,7 @@ namespace BetterFG.Patches.Social
                     foreach (var t in vm.GetComponentsInChildren<Transform>(true))
                         if (t.name == wantIcon) t.gameObject.SetActive(true);
             }
-            catch (Exception ex) { Debug.LogWarning("[DisplayWheel] icon enable failed: " + ex.Message); }
+            catch (Exception ex) { Plugin.Log.LogWarning("DisplayWheel: icon enable failed: " + ex.Message); }
         }
     }
 }

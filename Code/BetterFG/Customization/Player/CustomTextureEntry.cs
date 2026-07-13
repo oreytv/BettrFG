@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 using BetterFG.Services;
@@ -53,7 +53,7 @@ namespace BetterFG.Customization.Player
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[CustomTexEntry] Failed to load entries: {ex.Message}");
+                Plugin.Log.LogWarning($"CustomTexEntry: Failed to load entries: {ex.Message}");
             }
             return entries;
         }
@@ -77,11 +77,11 @@ namespace BetterFG.Customization.Player
                 sb.Append("]}");
                 string json = sb.ToString();
                 SettingsService.Set(ENTRIES_KEY, json);
-                Debug.Log($"[CustomTexEntry] Saved {entries.Count} entries");
+                Plugin.Log.LogInfo($"CustomTexEntry: Saved {entries.Count} entries");
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[CustomTexEntry] Failed to save entries: {ex.Message}");
+                Plugin.Log.LogWarning($"CustomTexEntry: Failed to save entries: {ex.Message}");
             }
         }
 
@@ -112,7 +112,7 @@ namespace BetterFG.Customization.Player
             if (entry == null || string.IsNullOrEmpty(entry.name)) return;
             if (EntryNameExists(entry.name, entries))
             {
-                Debug.LogWarning($"[CustomTexEntry] Entry '{entry.name}' already exists");
+                Plugin.Log.LogWarning($"CustomTexEntry: Entry '{entry.name}' already exists");
                 return;
             }
             entries.Add(entry);

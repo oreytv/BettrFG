@@ -76,7 +76,7 @@ namespace BetterFG.UI
                 if (_leftHeld) { mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, IntPtr.Zero); _leftHeld = false; }
                 _prevRight = false;
                 _scrollAccum = 0f;
-                fginputlockservice.SetControllerLock(false);
+                FGInputLockService.SetControllerLock(false);
                 return;
             }
 
@@ -136,7 +136,7 @@ namespace BetterFG.UI
             // WHOLE time it's open — not just on stick activity. gating on activity left a gap
             // between presses where a fresh button push fired in the game before the lock re-armed
             // (the "some presses leak through" bug).
-            fginputlockservice.SetControllerLock(true);
+            FGInputLockService.SetControllerLock(true);
         }
     }
 }

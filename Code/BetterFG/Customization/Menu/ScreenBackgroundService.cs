@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using BetterFG.Services;
 using UnityEngine;
@@ -137,7 +137,7 @@ namespace BetterFG.Customization.Menu
                         ptex.Apply();
                         cimg.material.SetTexture("_Pattern", ptex);
                     }
-                    catch (Exception ex) { Debug.LogError("[ScreenBg] pattern apply failed: " + ex.Message); }
+                    catch (Exception ex) { Plugin.Log.LogError("ScreenBg: pattern apply failed: " + ex.Message); }
                 }
             }
         }
@@ -168,9 +168,9 @@ namespace BetterFG.Customization.Menu
         // apply to a known single mask (used by the menu/title FallForce path)
         public static void Apply(Screen s, Transform mask)
         {
-            if (mask == null) { Debug.Log($"[ScreenBg] Apply {Id(s)}: mask null"); return; }
-            if (!Enabled(s)) { Debug.Log($"[ScreenBg] Apply {Id(s)}: not enabled, skipping"); return; }
-            Debug.Log($"[ScreenBg] Apply {Id(s)} onto {mask.name}");
+            if (mask == null) { Plugin.Log.LogInfo($"ScreenBg: Apply {Id(s)}: mask null"); return; }
+            if (!Enabled(s)) { Plugin.Log.LogInfo($"ScreenBg: Apply {Id(s)}: not enabled, skipping"); return; }
+            Plugin.Log.LogInfo($"ScreenBg: Apply {Id(s)} onto {mask.name}");
             ApplyToContainer(s, mask);
         }
 
@@ -180,11 +180,11 @@ namespace BetterFG.Customization.Menu
         public static void ApplyUnder(Screen s, Transform root)
         {
             if (root == null) return;
-            if (!Enabled(s)) { Debug.Log($"[ScreenBg] ApplyUnder {Id(s)}: not enabled, reverting"); RevertUnder(root); return; }
+            if (!Enabled(s)) { Plugin.Log.LogInfo($"ScreenBg: ApplyUnder {Id(s)}: not enabled, reverting"); RevertUnder(root); return; }
 
             int n = 0;
             foreach (var c in FindContainers(root)) { ApplyToContainer(s, c); n++; }
-            Debug.Log($"[ScreenBg] ApplyUnder {Id(s)}: applied to {n} container(s)");
+            Plugin.Log.LogInfo($"ScreenBg: ApplyUnder {Id(s)}: applied to {n} container(s)");
         }
 
         // revert every background container under the loading-screen canvas to the game's originals.
@@ -193,7 +193,7 @@ namespace BetterFG.Customization.Menu
             if (root == null) return;
             int n = 0;
             foreach (var c in FindContainers(root)) { RevertContainer(c); n++; }
-            Debug.Log($"[ScreenBg] RevertUnder: reverted {n} container(s)");
+            Plugin.Log.LogInfo($"ScreenBg: RevertUnder: reverted {n} container(s)");
         }
 
         // every transform with a Backdrop Image child — covers SeasonS11Background/Mask AND

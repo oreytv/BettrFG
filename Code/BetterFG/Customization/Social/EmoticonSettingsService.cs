@@ -53,7 +53,7 @@ namespace BetterFG.Customization.Social
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[EmoticonSettings] Load failed: {ex.Message}");
+                Plugin.Log.LogError($"EmoticonSettings: Load failed: {ex.Message}");
             }
 
             return list;
@@ -78,7 +78,7 @@ namespace BetterFG.Customization.Social
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[EmoticonSettings] Save failed: {ex.Message}");
+                Plugin.Log.LogError($"EmoticonSettings: Save failed: {ex.Message}");
             }
         }
     }

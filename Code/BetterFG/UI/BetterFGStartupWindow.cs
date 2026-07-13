@@ -344,7 +344,7 @@ namespace BetterFG.UI
                 tex.wrapMode = TextureWrapMode.Clamp;
                 _logoTex = tex;
             }
-            catch (Exception ex) { Debug.LogError($"[StartupWindow] logo load: {ex.Message}"); }
+            catch (Exception ex) { Plugin.Log.LogError($"StartupWindow: logo load: {ex.Message}"); }
             return _logoTex;
         }
     }

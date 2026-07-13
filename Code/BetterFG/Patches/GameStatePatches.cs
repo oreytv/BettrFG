@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
@@ -42,27 +42,9 @@ namespace BetterFG.Patches.GameStates
     [HarmonyPatch(typeof(MainMenuManager), nameof(MainMenuManager.OnMainMenuEntered), new[] { typeof(bool), typeof(bool) })]
     public class MainMenuBean
     {
-        // first-entry lag hunt: time each synchronous step so the log shows which one eats the ~5s
-        // freeze on the first menu. only logs the breakdown once (first entry), stays quiet after.
-        private static bool _timedFirstEntry;
-
         [HarmonyPostfix]
         public static void OnMainMenuEntered(MainMenuManager __instance)
         {
-            Debug.Log("[MainMenuBean] postfix");
-
-            bool trace = !_timedFirstEntry;
-            _timedFirstEntry = true;
-            var sw = trace ? System.Diagnostics.Stopwatch.StartNew() : null;
-            long last = 0;
-            void Mark(string what)
-            {
-                if (sw == null) return;
-                long now = sw.ElapsedMilliseconds;
-                Plugin.Log.LogInfo($"[MenuLagTrace] {what}: {now - last}ms (total {now}ms)");
-                last = now;
-            }
-
             if (__instance._lobbyVirtualCam != null)
             {
                 MenuCustomizationApplication.Instance?.CacheCamBase(__instance._lobbyVirtualCam);
@@ -74,15 +56,12 @@ namespace BetterFG.Patches.GameStates
 
             // enabled tweaks that react to entering the menu (anti-afk kill, lively fall guys reapply)
             BetterFG.Tweaks.BfgTweak.RaiseMainMenuEntered();
-            Mark("tweaks OnMainMenuEntered");
 
             BetterFG.UI.Tab.NametagTab.CacheNameAssets();
-            Mark("NametagTab.CacheNameAssets");
 
             MenuCustomizationApplication.Instance.StartCoroutine(MenuCustomizationApplication.ReapplyForegroundFromSettingsCoroutine().WrapToIl2Cpp());
 
             FontReplacementService.ReapplyFromSettings();
-            Mark("FontReplacementService.ReapplyFromSettings");
             // the game assigns fame/famepass nametag materials a few frames after the menu enters,
             // i.e. after the sweep above already swapped that text's font -> gold shader renders on the
             // wrong atlas = corruption. heal it once the materials have landed (reverts any touched text
@@ -91,7 +70,6 @@ namespace BetterFG.Patches.GameStates
 
             FeatureStars.CreateInMenu();
             FeatureQualificationTime.CreateInMenu();
-            Mark("FeatureStars+QualTime.CreateInMenu");
             //__instance.StartCoroutine(FeatureAllCosmetics.ApplyAgainAfterMenuSettles().WrapToIl2Cpp());
 
             if (__instance._menuFallGuy != null)
@@ -99,7 +77,6 @@ namespace BetterFG.Patches.GameStates
             if (__instance._lobbyFallGuy != null)
                 BeanMonitorService.PushBean(__instance._lobbyFallGuy);
             SkinApplicationService.Instance?.RestoreSavedGameCosmetics();
-            Mark("SkinApp.RestoreSavedGameCosmetics");
 
             if (BeanMonitorService.Instance != null)
             {
@@ -112,9 +89,7 @@ namespace BetterFG.Patches.GameStates
             BetterFG.Patches.ShowSelectorBg.AttachApplier();
 
             MenuCustomizationApplication.Instance?.ReapplyToMainMenu();
-            Mark("MenuCustomization.ReapplyToMainMenu");
             MenuCustomizationApplication.Instance?.SpawnMenuBg();
-            Mark("MenuCustomization.SpawnMenuBg");
 
             if (MenuCustomizationApplication.Instance != null)
             {
@@ -129,13 +104,10 @@ namespace BetterFG.Patches.GameStates
                 PlayerScaleService.ApplyToBean(__instance._menuFallGuy, PlayerScaleService.GetPlayerScale(), PlayerScaleService.BeanScaleMode.Local);
 
             SkinApplicationService.Instance.TryAutoReapplyCustomTextureForBean(__instance._menuFallGuy);
-            Mark("SkinApp.TryAutoReapplyCustomTexture");
             if (BeanMonitorService.Instance != null)
                 BeanMonitorService.Instance.StartCoroutine(DelayedCustomSkinTextureReapply().WrapToIl2Cpp());
 
-
-            try { NetworkClient.Instance?.RegisterLocalProfileFromApplication(); } catch { }
-            Mark("NetworkClient.RegisterLocalProfile");
+            try { NetworkClient.Instance?.RegisterLocalProfile(); } catch { }
 
             try
             {
@@ -155,7 +127,7 @@ namespace BetterFG.Patches.GameStates
             if (!string.IsNullOrEmpty(localName))
             {
                 LocalPlayerInfo.FGlocalplayerusername = localName;
-                Debug.Log($"[MainMenuBean] FG username set: {localName}");
+                Plugin.Log.LogInfo($"MainMenuBean: FG username set: {localName}");
             }
 
 #if PROFILES
@@ -177,8 +149,6 @@ namespace BetterFG.Patches.GameStates
             if (BetterFG.Services.MenuMusicService.Enabled
                 && !string.IsNullOrEmpty(BetterFG.Services.MenuMusicService.CurrentPath))
                 BetterFG.Services.MenuMusicService.Play();
-
-            if (sw != null) Plugin.Log.LogInfo($"[MenuLagTrace] === total synchronous OnMainMenuEntered: {sw.ElapsedMilliseconds}ms ===");
         }
 
         private static IEnumerator HideMenuClutter()
@@ -471,7 +441,7 @@ namespace BetterFG.Patches.GameStates
                 BetterFGUnityRounds.RestoreEnvironment();
                 return;
             }
-            Plugin.Log.LogInfo($"[UGCLevelLoad] round desc: {desc}");
+            Plugin.Log.LogInfo($"UGCLevelLoad: round desc: {desc}");
             if (!BetterFGUnityRounds.TryHandleDescription(desc))
             {
                 BetterFGUnityRounds.ResetRoundState(unloadBundle: true);
@@ -646,7 +616,7 @@ namespace BetterFG.Patches.GameStates
             var app = MenuCustomizationApplication.Instance;
             if (__instance == null || app == null) return;
 
-            app.StartCoroutine(app.ReapplySpecialForegroundNextFrame(MenuCustomizationApplication.specialscreen.PrivateLobbyPlayerList).WrapToIl2Cpp());
+            app.StartCoroutine(app.ReapplySpecialForegroundNextFrame(MenuCustomizationApplication.SpecialScreen.PrivateLobbyPlayerList).WrapToIl2Cpp());
             app.StartCoroutine(FeatureMorePlatformIcon.ApplyPrivateLobbyAfterOpen(__instance).WrapToIl2Cpp());
         }
     }
@@ -659,7 +629,7 @@ namespace BetterFG.Patches.GameStates
         {
             var app = MenuCustomizationApplication.Instance;
             if (__instance != null && app != null)
-                app.StartCoroutine(app.ReapplySpecialForegroundNextFrame(MenuCustomizationApplication.specialscreen.PrivateLobbyPlayerList).WrapToIl2Cpp());
+                app.StartCoroutine(app.ReapplySpecialForegroundNextFrame(MenuCustomizationApplication.SpecialScreen.PrivateLobbyPlayerList).WrapToIl2Cpp());
 
             FeatureMorePlatformIcon.QueuePrivateLobbyApply(__instance);
         }
@@ -685,7 +655,7 @@ namespace BetterFG.Patches.GameStates
         public static void Postfix()
         {
             var app = MenuCustomizationApplication.Instance;
-            app?.StartCoroutine(app.ReapplySpecialForegroundNextFrame(MenuCustomizationApplication.specialscreen.PrivateLobbyShowSelect).WrapToIl2Cpp());
+            app?.StartCoroutine(app.ReapplySpecialForegroundNextFrame(MenuCustomizationApplication.SpecialScreen.PrivateLobbyShowSelect).WrapToIl2Cpp());
             BetterFG.Tweaks.LobbyShowSearchTweak.OnShowListAwake();
         }
     }
@@ -697,7 +667,7 @@ namespace BetterFG.Patches.GameStates
         public static void Postfix()
         {
             var app = MenuCustomizationApplication.Instance;
-            app?.StartCoroutine(app.ReapplySpecialForegroundNextFrame(MenuCustomizationApplication.specialscreen.PrivateLobbyPlayerList).WrapToIl2Cpp());
+            app?.StartCoroutine(app.ReapplySpecialForegroundNextFrame(MenuCustomizationApplication.SpecialScreen.PrivateLobbyPlayerList).WrapToIl2Cpp());
         }
     }
 
@@ -769,7 +739,7 @@ namespace BetterFG.Patches.GameStates
             if (!isLocalPlayer || pNetObject == null) return;
             var bean = pNetObject.gameObject;
             if (bean == null) return;
-            Debug.Log($"[RoundBeanSpawn] local bean: {bean.name}");
+            Plugin.Log.LogInfo($"RoundBeanSpawn: local bean: {bean.name}");
             BeanMonitorService.LocalPlayerBean = bean;
             BeanMonitorService.PushBean(bean);
             //FeatureAllCosmetics.ApplyCachedToBean(bean);
@@ -845,7 +815,7 @@ namespace BetterFG.Patches.GameStates
             }
             catch (Exception ex)
             {
-                Debug.LogWarning("[QualScreen] platform " + ex.Message);
+                Plugin.Log.LogWarning("QualScreen: platform " + ex.Message);
             }
         }
 
@@ -987,7 +957,7 @@ namespace BetterFG.Patches.GameStates
                     var bean = handler?.FallGuyGameObject;
                     if (bean != null)
                     {
-                        Debug.Log($"[RewardScreen] bean: {bean.name}");
+                        Plugin.Log.LogInfo($"RewardScreen: bean: {bean.name}");
                         BeanMonitorService.PushBean(bean);
                         SkinApplicationService.Instance?.ReapplyExpectedGameCosmeticVisuals(bean);
                         BeanMonitorService.Instance.StartCoroutine(BeanMonitorService.PollAndPushRewardPlinth().WrapToIl2Cpp());
@@ -997,7 +967,7 @@ namespace BetterFG.Patches.GameStates
                 }
                 if (first) { yield return null; first = false; }
             }
-            Debug.LogWarning("[RewardScreen] timed out waiting for bean");
+            Plugin.Log.LogWarning("RewardScreen: timed out waiting for bean");
         }
     }
 
@@ -1067,15 +1037,15 @@ namespace BetterFG.Patches.GameStates
 
                 BetterFG.Tweaks.SkipVictoryTweak.ActiveState = victory;
 
-                Plugin.Log.LogInfo($"[VictoryScreen] ReplaceCurrentState -> StateVictoryScreen, starting handler");
+                Plugin.Log.LogInfo($"VictoryScreen: ReplaceCurrentState -> StateVictoryScreen, starting handler");
                 if (BeanMonitorService.Instance == null)
                 {
-                    Plugin.Log.LogWarning("[VictoryScreen] BeanMonitorService.Instance is null, can't start coroutine");
+                    Plugin.Log.LogWarning("VictoryScreen: BeanMonitorService.Instance is null, can't start coroutine");
                     return;
                 }
                 BeanMonitorService.Instance.StartCoroutine(HandleVictory(victory).WrapToIl2Cpp());
             }
-            catch (Exception ex) { Plugin.Log.LogError($"[VictoryScreen] postfix: {ex}"); }
+            catch (Exception ex) { Plugin.Log.LogError($"VictoryScreen: postfix: {ex}"); }
         }
 
         private static IEnumerator HandleVictory(StateVictoryScreen victory)
@@ -1095,7 +1065,7 @@ namespace BetterFG.Patches.GameStates
                         if (infos != null && infos.Count > 0) break;
                     }
                 }
-                catch (Exception ex) { Plugin.Log.LogError($"[VictoryScreen] poll infos: {ex}"); yield break; }
+                catch (Exception ex) { Plugin.Log.LogError($"VictoryScreen: poll infos: {ex}"); yield break; }
 
                 yield return new WaitForSeconds(0.1f);
                 elapsed += 0.1f;
@@ -1103,7 +1073,7 @@ namespace BetterFG.Patches.GameStates
 
             if (infos == null || infos.Count == 0)
             {
-                Plugin.Log.LogWarning($"[VictoryScreen] winner infos never populated after {elapsed:0.0}s");
+                Plugin.Log.LogWarning($"VictoryScreen: winner infos never populated after {elapsed:0.0}s");
                 yield break;
             }
 
@@ -1111,7 +1081,7 @@ namespace BetterFG.Patches.GameStates
             try
             {
                 string localkey = GlobalGameStateClient.Instance?.GetLocalPlayerKey();
-                Plugin.Log.LogInfo($"[VictoryScreen] localkey={localkey}, winnerCount={infos.Count}");
+                Plugin.Log.LogInfo($"VictoryScreen: localkey={localkey}, winnerCount={infos.Count}");
                 if (string.IsNullOrEmpty(localkey)) yield break;
 
                 // platform prefix varies for the same account (pc_steam_, xb1_, switch_, ...),
@@ -1122,22 +1092,22 @@ namespace BetterFG.Patches.GameStates
                 {
                     var info = infos[i];
                     string winnerKey = info?.PlayerMetadata?.PlayerKey;
-                    Plugin.Log.LogInfo($"[VictoryScreen] winner[{i}] key={winnerKey}");
+                    Plugin.Log.LogInfo($"VictoryScreen: winner[{i}] key={winnerKey}");
                     if (string.IsNullOrEmpty(winnerKey)) continue;
 
                     if (PlayerUtils.CleanPlayerName(winnerKey).Equals(localName, StringComparison.OrdinalIgnoreCase))
                     {
                         localWinner = info;
-                        Plugin.Log.LogInfo($"[VictoryScreen] matched local winner at index {i}");
+                        Plugin.Log.LogInfo($"VictoryScreen: matched local winner at index {i}");
                         break;
                     }
                 }
             }
-            catch (Exception ex) { Plugin.Log.LogError($"[VictoryScreen] resolve: {ex}"); yield break; }
+            catch (Exception ex) { Plugin.Log.LogError($"VictoryScreen: resolve: {ex}"); yield break; }
 
             if (localWinner == null)
             {
-                Plugin.Log.LogInfo("[VictoryScreen] local player is not the winner, nothing to do");
+                Plugin.Log.LogInfo("VictoryScreen: local player is not the winner, nothing to do");
                 yield break;
             }
 
@@ -1151,7 +1121,7 @@ namespace BetterFG.Patches.GameStates
             try
             {
                 var vm = localWinner.NamePlateRef;
-                Plugin.Log.LogInfo($"[VictoryScreen] NamePlateRef={(vm != null)}");
+                Plugin.Log.LogInfo($"VictoryScreen: NamePlateRef={(vm != null)}");
                 // we already know this is the local player, so pass the local username as the
                 // key — that's what HandleViewModel matches on to route to the local path.
                 if (vm != null)
@@ -1163,12 +1133,12 @@ namespace BetterFG.Patches.GameStates
                     BeanMonitorService.Instance.StartCoroutine(NudgeVictoryIcon(vm).WrapToIl2Cpp());
                 }
             }
-            catch (Exception ex) { Plugin.Log.LogWarning($"[VictoryScreen] nameplate: {ex}"); }
+            catch (Exception ex) { Plugin.Log.LogWarning($"VictoryScreen: nameplate: {ex}"); }
 
             BeanMonitorService.Instance.StartCoroutine(BeanMonitorService.PollAndPushVictoryPlinth().WrapToIl2Cpp());
 
             var spawn = localWinner._spawnTransform;
-            Plugin.Log.LogInfo($"[VictoryScreen] spawnTransform={(spawn != null ? spawn.name : "null")}");
+            Plugin.Log.LogInfo($"VictoryScreen: spawnTransform={(spawn != null ? spawn.name : "null")}");
             if (spawn != null)
                 BeanMonitorService.Instance.StartCoroutine(PollForBean(spawn).WrapToIl2Cpp());
         }
@@ -1188,7 +1158,7 @@ namespace BetterFG.Patches.GameStates
                 var t = FindIconUnder(vm.transform);
                 iconRt = t != null ? t.GetComponent<RectTransform>() : null;
             }
-            catch (Exception ex) { Plugin.Log.LogWarning($"[VictoryScreen] nudge find: {ex.Message}"); yield break; }
+            catch (Exception ex) { Plugin.Log.LogWarning($"VictoryScreen: nudge find: {ex.Message}"); yield break; }
 
             if (iconRt == null) yield break;
             iconRt.anchoredPosition += new Vector2(VICTORY_ICON_NUDGE_X, VICTORY_ICON_NUDGE_Y);
@@ -1219,11 +1189,11 @@ namespace BetterFG.Patches.GameStates
                         yield break;
                     }
                 }
-                catch (Exception ex) { Debug.LogError($"[VictoryScreen] poll: {ex.Message}"); yield break; }
+                catch (Exception ex) { Plugin.Log.LogError($"VictoryScreen: poll: {ex.Message}"); yield break; }
                 yield return new WaitForSeconds(0.25f);
                 elapsed += 0.25f;
             }
-            Debug.LogWarning("[VictoryScreen] timed out waiting for bean");
+            Plugin.Log.LogWarning("VictoryScreen: timed out waiting for bean");
         }
     }
 
@@ -1243,7 +1213,7 @@ namespace BetterFG.Patches.GameStates
                 MenuCustomizationApplication.Instance.StartCoroutine(
                     MenuCustomizationApplication.ReapplyForegroundFromSettingsCoroutine(__instance.transform).WrapToIl2Cpp());
             }
-            catch (Exception ex) { Plugin.Log.LogWarning($"[VictoryScreen] likes panel reapply: {ex}"); }
+            catch (Exception ex) { Plugin.Log.LogWarning($"VictoryScreen: likes panel reapply: {ex}"); }
         }
     }
 
@@ -1268,7 +1238,7 @@ namespace BetterFG.Patches.GameStates
             if (fgcc != null)
             {
                 BeanMonitorService.LocalPlayerBean = fgcc.gameObject;
-                Debug.Log($"[CLS] player set: {fgcc.gameObject.name}");
+                Plugin.Log.LogInfo($"CLS: player set: {fgcc.gameObject.name}");
 
                 // apply the local bean's colour/pattern/texture + game cosmetics from here (behind
                 // the loading screen) instead of on spawn, so the skin doesn't visibly pop in during
@@ -1284,7 +1254,7 @@ namespace BetterFG.Patches.GameStates
                 if (indicator != null)
                     indicator.transform.localPosition = Vector3.zero;
             }
-            catch (Exception ex) { Debug.LogWarning($"[CLS] landing indicator: {ex.Message}"); }
+            catch (Exception ex) { Plugin.Log.LogWarning($"CLS: landing indicator: {ex.Message}"); }
 
             CameraUtils.DisableXRayRenderer();
             NetworkClient.Instance?.OnRoundStart();
@@ -1360,7 +1330,7 @@ namespace BetterFG.Patches.GameStates
                 yield return new WaitForSeconds(0.25f);
                 elapsed += 0.25f;
             }
-            Debug.LogWarning("[CLS] nametag never appeared after 10s");
+            Plugin.Log.LogWarning("CLS: nametag never appeared after 10s");
         }
     }
 
@@ -1453,7 +1423,7 @@ namespace BetterFG.Patches.GameStates
                     EmoteInjectionService.InjectSlots(primeHandler);
                 }
             }
-            catch (Exception ex) { Debug.LogWarning($"[HSR] phrase patch: {ex.Message}"); }
+            catch (Exception ex) { Plugin.Log.LogWarning($"HSR: phrase patch: {ex.Message}"); }
 
             // fan out round-start to every enabled tweak that overrides OnRoundStart (noises, camera
             // assist, server info, respawn, lively fall guys). each keeps its own logic; this is the
@@ -1602,15 +1572,15 @@ namespace BetterFG.Patches.GameStates
         [HarmonyPrefix]
         private static void Prefix(ClientGameManager __instance)
         {
-            BetterFG.Tweaks.spectatorMusicTweak.ApplyIfWanted(__instance);
-            BetterFG.Tweaks.spectatorMusicTweak.ForceSpectatorMix(true);
+            BetterFG.Tweaks.SpectatorMusicTweak.ApplyIfWanted(__instance);
+            BetterFG.Tweaks.SpectatorMusicTweak.ForceSpectatorMix(true);
         }
 
         [HarmonyPostfix]
         private static void Postfix(ClientGameManager __instance)
         {
-            BetterFG.Tweaks.spectatorMusicTweak.ApplyIfWanted(__instance);
-            BetterFG.Tweaks.spectatorMusicTweak.ForceSpectatorMix(true);
+            BetterFG.Tweaks.SpectatorMusicTweak.ApplyIfWanted(__instance);
+            BetterFG.Tweaks.SpectatorMusicTweak.ForceSpectatorMix(true);
             BetterFG.Tweaks.BfgTweak.RaiseSpectatorMode();
             FeatureTimePlacement.OnSpectatorMode();
         }

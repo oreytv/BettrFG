@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.IO;
 using BetterFG.Utilities;
 using BepInEx;
@@ -28,11 +28,11 @@ namespace BetterFG.Features.Stars
                     if (!string.IsNullOrEmpty(id))
                         _cleared.Add(id);
                 }
-                Debug.Log($"StarStore: loaded {_cleared.Count} cleared levels");
+                Plugin.Log.LogInfo($"StarStore: loaded {_cleared.Count} cleared levels");
             }
             catch (System.Exception ex)
             {
-                Debug.LogWarning($"StarStore: load failed: {ex.Message}");
+                Plugin.Log.LogWarning($"StarStore: load failed: {ex.Message}");
             }
         }
 
@@ -54,13 +54,13 @@ namespace BetterFG.Features.Stars
             }
             catch (System.Exception ex)
             {
-                Debug.LogWarning($"StarStore: save failed: {ex.Message}");
+                Plugin.Log.LogWarning($"StarStore: save failed: {ex.Message}");
             }
         }
 
         public static bool HasCleared(string roundId)
         {
-            if (!BetterFG.Features.featureRegistry.IsOn("stars", "store")) return false;
+            if (!BetterFG.Features.FeatureRegistry.IsOn("stars", "store")) return false;
             EnsureLoaded();
             return _cleared.Contains(roundId);
         }
@@ -68,7 +68,7 @@ namespace BetterFG.Features.Stars
         // returns true if this is a new clear
         public static bool TryRecord(string roundId)
         {
-            if (!BetterFG.Features.featureRegistry.IsOn("stars", "store")) return false;
+            if (!BetterFG.Features.FeatureRegistry.IsOn("stars", "store")) return false;
             EnsureLoaded();
             if (_cleared.Contains(roundId)) return false;
             _cleared.Add(roundId);
@@ -80,7 +80,7 @@ namespace BetterFG.Features.Stars
         {
             get
             {
-                if (!BetterFG.Features.featureRegistry.IsOn("stars", "store")) return 0;
+                if (!BetterFG.Features.FeatureRegistry.IsOn("stars", "store")) return 0;
                 EnsureLoaded();
                 return _cleared.Count;
             }
@@ -88,7 +88,7 @@ namespace BetterFG.Features.Stars
 
         public static HashSet<string> GetAll()
         {
-            if (!BetterFG.Features.featureRegistry.IsOn("stars", "store")) return new HashSet<string>();
+            if (!BetterFG.Features.FeatureRegistry.IsOn("stars", "store")) return new HashSet<string>();
             EnsureLoaded();
             return _cleared;
         }

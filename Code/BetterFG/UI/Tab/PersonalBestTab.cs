@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Reflection;
 using System.Collections.Generic;
@@ -121,7 +121,7 @@ namespace BetterFG.UI.Tab
                 tex.wrapMode = TextureWrapMode.Clamp;
                 cache = tex;
             }
-            catch (Exception ex) { Debug.LogError("[BetterFG] Tex load failed: " + ex.Message); }
+            catch (Exception ex) { Plugin.Log.LogError("BetterFG: Tex load failed: " + ex.Message); }
             return cache;
         }
 

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using FGClient;
 using NAudio.Wave;
@@ -72,11 +72,11 @@ namespace BetterFG.Features.UnityRound
                 _playing = true;
 
                 TryPauseGameMusic();
-                Debug.Log("[RoundMusicService] custom song started");
+                Plugin.Log.LogInfo("RoundMusicService: custom song started");
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[RoundMusicService] start failed: {ex.Message}");
+                Plugin.Log.LogWarning($"RoundMusicService: start failed: {ex.Message}");
                 Stop();
             }
         }

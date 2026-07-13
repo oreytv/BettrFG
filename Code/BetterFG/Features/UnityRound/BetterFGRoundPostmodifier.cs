@@ -44,7 +44,7 @@ namespace BetterFG.Features.UnityRound
                 pendingSkybox = null;
             }
 
-            Debug.Log($"[BetterFGRoundPostmodifier] env applied (ambientMode={info.ambientMode} fog={info.fog})");
+            Plugin.Log.LogInfo($"BetterFGRoundPostmodifier: env applied (ambientMode={info.ambientMode} fog={info.fog})");
         }
 
         // spawnpoint -> CheckpointZone injection commented out; checkpoints now come from the level editor.
@@ -58,7 +58,7 @@ namespace BetterFG.Features.UnityRound
             Transform spawnRoot = FindSpawnpoints(round.transform);
             if (spawnRoot == null)
             {
-                Debug.LogWarning("[BetterFGRoundPostmodifier] no spawnpoints child found, skipping remap");
+                Plugin.Log.LogWarning("BetterFGRoundPostmodifier: no spawnpoints child found, skipping remap");
                 return;
             }
 
@@ -67,7 +67,7 @@ namespace BetterFG.Features.UnityRound
 
             if (locators.Count == 0)
             {
-                Debug.LogWarning("[BetterFGRoundPostmodifier] spawnpoints has no children");
+                Plugin.Log.LogWarning("BetterFGRoundPostmodifier: spawnpoints has no children");
                 return;
             }
 
@@ -91,7 +91,7 @@ namespace BetterFG.Features.UnityRound
 
             if (cm == null)
             {
-                Debug.LogWarning("[BetterFGRoundPostmodifier] CheckpointManager not found");
+                Plugin.Log.LogWarning("BetterFGRoundPostmodifier: CheckpointManager not found");
                 return;
             }
 
@@ -102,7 +102,7 @@ namespace BetterFG.Features.UnityRound
             newZones[oldLen] = zone;
             cm._checkpointZones = newZones;
 
-            Debug.Log($"[BetterFGRoundPostmodifier] injected zone with {locators.Count} locators (was {oldLen} zones)");
+            Plugin.Log.LogInfo($"BetterFGRoundPostmodifier: injected zone with {locators.Count} locators (was {oldLen} zones)");
         }
 
         private static Transform FindSpawnpoints(Transform t)
@@ -127,7 +127,7 @@ namespace BetterFG.Features.UnityRound
             var pm = UnityEngine.Object.FindObjectOfType<PhysicsManager>();
             if (pm == null)
             {
-                Debug.LogWarning("[BetterFGRoundPostmodifier] PhysicsManager not found, skipping physic material remap");
+                Plugin.Log.LogWarning("BetterFGRoundPostmodifier: PhysicsManager not found, skipping physic material remap");
                 return;
             }
 
@@ -159,7 +159,7 @@ namespace BetterFG.Features.UnityRound
                 count++;
             }
 
-            Debug.Log($"[BetterFGRoundPostmodifier] remapped {count} physic materials");
+            Plugin.Log.LogInfo($"BetterFGRoundPostmodifier: remapped {count} physic materials");
         }
 
         // exactly what we switched off, so restore is precise + symmetric
@@ -200,7 +200,7 @@ namespace BetterFG.Features.UnityRound
                 }
             }
 
-            Debug.Log($"[BetterFGRoundPostmodifier] disabled {_disabled.Count} objects (keepExisting={keepExisting})");
+            Plugin.Log.LogInfo($"BetterFGRoundPostmodifier: disabled {_disabled.Count} objects (keepExisting={keepExisting})");
         }
 
         // Re-enables exactly what DisableCreativeModeObjects switched off.
@@ -247,7 +247,7 @@ namespace BetterFG.Features.UnityRound
                 count++;
             }
 
-            Debug.Log($"[BetterFGRoundPostmodifier] registered {count} mantle targets");
+            Plugin.Log.LogInfo($"BetterFGRoundPostmodifier: registered {count} mantle targets");
         }
 
         private static void DisableLightProbesOnAllRenderers()
@@ -264,7 +264,7 @@ namespace BetterFG.Features.UnityRound
                     foreach (var r in renderers) { r.lightProbeUsage = LightProbeUsage.Off; count++; }
                 }
             }
-            Debug.Log($"[BetterFGRoundPostmodifier] lightProbeUsage=Off on {count} renderers");
+            Plugin.Log.LogInfo($"BetterFGRoundPostmodifier: lightProbeUsage=Off on {count} renderers");
         }
 
         private static Transform FindEndgoals(Transform t)
@@ -285,7 +285,7 @@ namespace BetterFG.Features.UnityRound
             var endgoalsRoot = FindEndgoals(round.transform);
             if (endgoalsRoot == null || endgoalsRoot.childCount == 0)
             {
-                Debug.LogWarning("[BetterFGRoundPostmodifier] no endgoals found in round hierarchy");
+                Plugin.Log.LogWarning("BetterFGRoundPostmodifier: no endgoals found in round hierarchy");
                 return;
             }
 
@@ -297,7 +297,7 @@ namespace BetterFG.Features.UnityRound
                 BetterFGUnityRounds.CcccTransform = realEndzone.transform;
             }
             else
-                Debug.LogWarning("[BetterFGRoundPostmodifier] COMMON_ObjectiveReachEndZone not found, CCCC unavailable");
+                Plugin.Log.LogWarning("BetterFGRoundPostmodifier: COMMON_ObjectiveReachEndZone not found, CCCC unavailable");
 
             var goals = new GameObject[endgoalsRoot.childCount];
             int count = 0;
@@ -314,7 +314,7 @@ namespace BetterFG.Features.UnityRound
             }
 
             BetterFGUnityRounds.ActiveEndgoals = goals;
-            Debug.Log($"[BetterFGRoundPostmodifier] registered {count} endgoals (CCCC={BetterFGUnityRounds.CcccPosition})");
+            Plugin.Log.LogInfo($"BetterFGRoundPostmodifier: registered {count} endgoals (CCCC={BetterFGUnityRounds.CcccPosition})");
         }
     }
 }

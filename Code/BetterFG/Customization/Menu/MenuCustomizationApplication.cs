@@ -497,23 +497,23 @@ namespace BetterFG.Customization.Menu
             }
         }
 
-        public enum specialscreen
+        public enum SpecialScreen
         {
             PrivateLobbyShowSelect,
             PrivateLobbyPlayerList
         }
 
-        public IEnumerator ReapplySpecialForegroundNextFrame(specialscreen screen)
+        public IEnumerator ReapplySpecialForegroundNextFrame(SpecialScreen screen)
         {
             yield return null;
             ReapplySpecialForeground(screen);
         }
 
-        public void ReapplySpecialForeground(specialscreen screen)
+        public void ReapplySpecialForeground(SpecialScreen screen)
         {
             switch (screen)
             {
-                case specialscreen.PrivateLobbyShowSelect:
+                case SpecialScreen.PrivateLobbyShowSelect:
                 {
                     var root = GameObject.Find("UICanvas_Client_V2(Clone)/Default/Prefab_UI_PrivateLobbyShowSelect(Clone)");
                     if (root == null) return;
@@ -521,7 +521,7 @@ namespace BetterFG.Customization.Menu
                     ApplyPrivateLobbyShowSelect(root.transform);
                     break;
                 }
-                case specialscreen.PrivateLobbyPlayerList:
+                case SpecialScreen.PrivateLobbyPlayerList:
                 {
                     var root = GameObject.Find("UICanvas_Client_V2(Clone)/Default/Prime_UI_PrivateLobbyPlayerList(Clone)");
                     if (root == null) return;
@@ -535,8 +535,8 @@ namespace BetterFG.Customization.Menu
 
         public void ApplyKnownSpecialForegroundScreens()
         {
-            ReapplySpecialForeground(specialscreen.PrivateLobbyShowSelect);
-            ReapplySpecialForeground(specialscreen.PrivateLobbyPlayerList);
+            ReapplySpecialForeground(SpecialScreen.PrivateLobbyShowSelect);
+            ReapplySpecialForeground(SpecialScreen.PrivateLobbyPlayerList);
 
             // navigation overlay sits outside UICanvas_Client_V2, so the main sweep misses it.
             var nav = GameObject.Find("Prefab_UI_NavigationOverlay(Clone)");
@@ -679,7 +679,7 @@ namespace BetterFG.Customization.Menu
         {
             if (_pinkGreyMat != null) return _pinkGreyMat;
             var sh = BetterFG.Core.AssetManager.GetShader("bettrfg_ui_shader");
-            if (sh == null) { Debug.LogWarning("[PinkGrey] bettrfg_ui_shader not loaded — recolour disabled"); return null; }
+            if (sh == null) { Plugin.Log.LogWarning("bettrfg_ui_shader missing, menu recolour is off"); return null; }
             _pinkGreyMat = new UnityEngine.Material(sh) { hideFlags = HideFlags.HideAndDontSave };
             UnityEngine.Object.DontDestroyOnLoad(_pinkGreyMat);
             return _pinkGreyMat;
@@ -842,7 +842,6 @@ namespace BetterFG.Customization.Menu
             foreach (var id in _lobbyTexOriginals.Keys) { _fgOriginals.Remove(id); _fgTouchedImages.Remove(id); }
             _lobbyTexOriginals.Clear();
             _lobbyColorOriginals.Clear();
-            Debug.Log("[LobbyBGFG] reverted");
         }
 
         public static IEnumerator ApplyLobbyBGForegroundNextFrame()
@@ -933,7 +932,6 @@ namespace BetterFG.Customization.Menu
                 img.color = new Color(target.r, target.g, target.b, original.a);
             }
 
-            Debug.Log("[LobbyBGFG] custom slot colours applied");
         }
 
         // gradient settings keys — these are the FallForce screen's keys (menu + title share them).
@@ -1057,7 +1055,7 @@ namespace BetterFG.Customization.Menu
                 var loadReq = AssetBundle.LoadFromMemoryAsync(bytes);
                 yield return loadReq;
                 bundle = loadReq.assetBundle;
-                if (bundle == null) { Debug.LogWarning($"[Plinth] lobby bundle load failed '{info.file}'"); yield break; }
+                if (bundle == null) { Plugin.Log.LogWarning($"lobby plinth bundle wouldn't load: {info.file}"); yield break; }
                 bundle = GetOrRegisterBundle(info.file, bundle);
             }
             yield return ApplyToSlotCoroutine(slot, info, bundle).WrapToIl2Cpp();
@@ -1073,7 +1071,7 @@ namespace BetterFG.Customization.Menu
                 TweakFallGuysBgForBetterfg();
 
                 var go = AssetManager.SpawnPersistent("betterfg_menubg");
-                if (go == null) { Debug.LogWarning("menubg prefab not found"); return; }
+                if (go == null) { Plugin.Log.LogWarning("menubg prefab missing from the bundle"); return; }
 
                 _menuBgGo = go;
                 _menuBgGo.transform.SetParent(GameObject.Find(FGUI_CUSTOM_BACKDROP_PARENT_PATH).transform, true);
@@ -1104,7 +1102,6 @@ namespace BetterFG.Customization.Menu
             _plinthColSaved = false;
             StartCoroutine(ApplyAmbientAndSunNextFrame().WrapToIl2Cpp());
 
-            Debug.Log("[MenuBg] spawned/restored");
         }
 
         // title screen uses the FallForce screen's gradient + pattern (same look as the menu).
@@ -1182,9 +1179,9 @@ namespace BetterFG.Customization.Menu
             foreach (var name in new[] { "Unlit/Texture", "Unlit/Transparent", "Universal Render Pipeline/Unlit", "Sprites/Default", "UI/Default" })
             {
                 shader = Shader.Find(name);
-                if (shader != null) { Debug.Log("[MenuBgImg] using shader: " + name); break; }
+                if (shader != null) break;
             }
-            if (shader == null) { Debug.LogWarning("[MenuBgImg] no unlit shader found"); return; }
+            if (shader == null) return;
 
             var mat = new Material(shader);
             mat.color = Color.white;
@@ -1248,28 +1245,18 @@ namespace BetterFG.Customization.Menu
             {
                 var bytes = System.IO.File.ReadAllBytes(path);
                 var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
-                if (!tex.LoadImage(bytes)) { Debug.LogWarning("[MenuBgImg] LoadImage failed"); return; }
+                if (!tex.LoadImage(bytes)) { Plugin.Log.LogWarning($"not a decodable image: {System.IO.Path.GetFileName(path)}"); return; }
                 tex.wrapMode = TextureWrapMode.Clamp;
                 tex.Apply();
                 if (_menuBgImageTex != null) Destroy(_menuBgImageTex);
                 _menuBgImageTex = tex;
 
-                bool bound = false;
                 foreach (var prop in new[] { "_MainTex", "_BaseMap", "_BaseColorMap", "_UnlitColorMap", "_Texture", "_Tex" })
-                {
                     if (_menuBgImageMat.HasProperty(prop))
-                    {
                         _menuBgImageMat.SetTexture(prop, tex);
-                        bound = true;
-                        Debug.Log($"[MenuBgImg] bound texture to {prop} on shader '{_menuBgImageMat.shader.name}'");
-                    }
-                }
                 _menuBgImageMat.mainTexture = tex;
-                if (!bound)
-                    Debug.LogWarning($"[MenuBgImg] shader '{_menuBgImageMat.shader.name}' has no known tex property");
-                Debug.Log($"[MenuBgImg] texture applied {tex.width}x{tex.height}, mainTexture null? {_menuBgImageMat.mainTexture == null}");
             }
-            catch (Exception ex) { Debug.LogError("[MenuBgImg] texture load failed: " + ex.Message); }
+            catch (Exception ex) { Plugin.Log.LogError($"menu bg image '{System.IO.Path.GetFileName(path)}' failed to load: {ex.Message}"); }
         }
 
         public void ApplyImageBgTransform(float posX, float posY, float posZ, float scaleUniform, float scaleX, float scaleY)
@@ -1321,7 +1308,6 @@ namespace BetterFG.Customization.Menu
             }
             RenderSettings.ambientMode = AmbientMode.Flat;
             RenderSettings.ambientLight = color;
-            Debug.Log($"[MenuAmbient] applied {color} mode={RenderSettings.ambientMode} -> readback light={RenderSettings.ambientLight} mode={RenderSettings.ambientMode}");
         }
 
         public void RevertAmbient()
@@ -1336,9 +1322,7 @@ namespace BetterFG.Customization.Menu
         {
             // only apply in the menu scene — gate on the root MainMenuManager existing
             if (GameObject.Find("MainMenuManager") == null) return;
-            string on = SettingsService.Get(KEY_AMBIENT_ON, "false");
-            Debug.Log($"[MenuAmbient] FromSettings on='{on}'");
-            if (on != "true") return;
+            if (SettingsService.Get(KEY_AMBIENT_ON, "false") != "true") return;
             ApplyAmbient(new Color(ParseF(KEY_AMBIENT_R, 0.5f), ParseF(KEY_AMBIENT_G, 0.5f), ParseF(KEY_AMBIENT_B, 0.5f)));
         }
 
@@ -1477,9 +1461,9 @@ namespace BetterFG.Customization.Menu
                 _appliedPatternTex = tex;
 
                 img.material.SetTexture("_Pattern", tex);
-                Debug.Log("[MenuBg] Pattern applied: " + System.IO.Path.GetFileName(path));
+                Plugin.Log.LogInfo($"menu pattern -> {System.IO.Path.GetFileName(path)}");
             }
-            catch (Exception ex) { Debug.LogError("[MenuBg] Pattern apply failed: " + ex.Message); }
+            catch (Exception ex) { Plugin.Log.LogError($"menu pattern failed: {ex.Message}"); }
         }
 
         public void RestorePattern()
@@ -1499,7 +1483,6 @@ namespace BetterFG.Customization.Menu
                 Destroy(_appliedPatternTex);
                 _appliedPatternTex = null;
             }
-            Debug.Log("[MenuBg] Pattern restored");
         }
 
         public void ApplyGradient(Color top, Color bot, float bias, float smoothness)
@@ -1555,7 +1538,6 @@ namespace BetterFG.Customization.Menu
             _appliedFile = null;
             _origActive = true;
 
-            Debug.Log("[Plinth] removed, all slots and bundles cleared");
         }
 
         public bool HasPlinthApplied => _appliedPlinth != null || _lastInfo != null;
@@ -1570,7 +1552,7 @@ namespace BetterFG.Customization.Menu
 
             if (holder == null || mesh == null)
             {
-                Debug.LogWarning("[Plinth] main menu holder/mesh not found");
+                Plugin.Log.LogWarning("no plinth holder/mesh in the main menu, skipping");
                 OnStatus?.Invoke("Plinth: mesh not found");
                 yield break;
             }
@@ -1587,7 +1569,7 @@ namespace BetterFG.Customization.Menu
             string prefabName = FindPrefabName(bundle);
             if (prefabName == null)
             {
-                Debug.LogWarning("[Plinth] no prefab found in bundle");
+                Plugin.Log.LogWarning("plinth bundle has no prefab");
                 OnStatus?.Invoke("Plinth: bad bundle");
                 mesh.SetActive(_origActive);
                 yield break;
@@ -1599,7 +1581,7 @@ namespace BetterFG.Customization.Menu
             var prefab = req.asset?.Cast<GameObject>();
             if (prefab == null)
             {
-                Debug.LogWarning("[Plinth] prefab cast failed");
+                Plugin.Log.LogWarning("plinth prefab cast failed");
                 OnStatus?.Invoke("Plinth: load failed");
                 mesh.SetActive(_origActive);
                 yield break;
@@ -1618,7 +1600,7 @@ namespace BetterFG.Customization.Menu
             _appliedPlinth = clone;
             _appliedFile = info.file;
 
-            Debug.Log($"[Plinth] applied '{info.name}' (main menu)");
+            Plugin.Log.LogInfo($"plinth {info.name} on the main menu");
             OnStatus?.Invoke($"Plinth: {info.name}");
         }
 
@@ -1642,7 +1624,7 @@ namespace BetterFG.Customization.Menu
             string prefabName = FindPrefabName(bundle);
             if (prefabName == null)
             {
-                Debug.LogWarning($"[Plinth] no prefab in bundle (slot '{slot.type}')");
+                Plugin.Log.LogWarning($"plinth bundle has no prefab, slot {slot.type}");
                 slot.meshGO.SetActive(_extraOrigActive[id]);
                 yield break;
             }
@@ -1653,7 +1635,7 @@ namespace BetterFG.Customization.Menu
             var prefab = req.asset?.Cast<GameObject>();
             if (prefab == null)
             {
-                Debug.LogWarning($"[Plinth] prefab cast failed (slot '{slot.type}')");
+                Plugin.Log.LogWarning($"plinth prefab cast failed, slot {slot.type}");
                 slot.meshGO.SetActive(_extraOrigActive[id]);
                 yield break;
             }
@@ -1669,7 +1651,7 @@ namespace BetterFG.Customization.Menu
             SkinApplicationService.SetRenderQueue(clone, 3000);
 
             _extraApplied[id] = clone;
-            Debug.Log($"[Plinth] applied '{info.name}' to slot '{slot.type}'");
+            Plugin.Log.LogInfo($"plinth {info.name} -> slot {slot.type}");
         }
 
         // ── Banner colour overrides (Qualified / Eliminated) ──────────────────

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
@@ -46,7 +46,7 @@ namespace BetterFG.Customization.Social
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogWarning($"[SocialSpriteCache] failed to load {path}: {ex.Message}");
+                    Plugin.Log.LogWarning($"SocialSpriteCache: failed to load {path}: {ex.Message}");
                     return false;
                 }
             }

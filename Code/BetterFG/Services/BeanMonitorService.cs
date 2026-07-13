@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 using BetterFG.Customization.Player;
@@ -22,8 +22,6 @@ namespace BetterFG.Services
 
     public class BeanMonitorService : MonoBehaviour
     {
-        public event Action<string> OnBeanLog;
-
         public static BeanMonitorService Instance { get; private set; }
 
         private static GameObject _localPlayerBean;
@@ -104,9 +102,7 @@ namespace BetterFG.Services
             int id = bean.GetInstanceID();
             if (loggedBeans.ContainsKey(id)) return;
             loggedBeans[id] = bean;
-            string msg = $"Found bean: {bean.name}";
-            OnBeanLog?.Invoke(msg);
-            Debug.Log($"[BeanMonitor] {msg}");
+            Plugin.Log.LogInfo($"new bean, {bean.name}");
         }
 
         public static GameObject CheckLevelEditorBean()
@@ -143,7 +139,7 @@ namespace BetterFG.Services
             int id = bean.GetInstanceID();
             if (Instance.remoteLobbyBeans.ContainsKey(id)) return;
             Instance.remoteLobbyBeans[id] = bean;
-            Debug.Log($"[BeanMonitor] remote lobby bean: {bean.name}");
+            Plugin.Log.LogInfo($"BeanMonitor: remote lobby bean: {bean.name}");
         }
 
         public static List<GameObject> GetRemoteLobbyBeans()
@@ -192,7 +188,7 @@ namespace BetterFG.Services
                 yield return new WaitForSeconds(0.25f);
                 elapsed += 0.25f;
             }
-            Debug.LogWarning("[PlinthMonitor] timed out waiting for victory plinth");
+            Plugin.Log.LogWarning("PlinthMonitor: timed out waiting for victory plinth");
         }
 
         // polls until the reward plinth GO exists, then registers it
@@ -209,7 +205,7 @@ namespace BetterFG.Services
                 }
                 if (first) { yield return null; first = false; }
             }
-            Debug.LogWarning("[PlinthMonitor] timed out waiting for reward plinth");
+            Plugin.Log.LogWarning("PlinthMonitor: timed out waiting for reward plinth");
         }
 
         public static void PushPlinthByPath(string holderPath, string meshSubPath, PlinthType type)
@@ -219,14 +215,14 @@ namespace BetterFG.Services
             var holder = GameObject.Find(holderPath);
             if (holder == null)
             {
-                Debug.LogWarning($"[PlinthMonitor] holder not found: {holderPath}");
+                Plugin.Log.LogWarning($"PlinthMonitor: holder not found: {holderPath}");
                 return;
             }
 
             var meshT = holder.transform.Find(meshSubPath);
             if (meshT == null)
             {
-                Debug.LogWarning($"[PlinthMonitor] mesh child '{meshSubPath}' not found under {holderPath}");
+                Plugin.Log.LogWarning($"PlinthMonitor: mesh child '{meshSubPath}' not found under {holderPath}");
                 return;
             }
 
@@ -240,13 +236,13 @@ namespace BetterFG.Services
             int id = holderGO.GetInstanceID();
             if (Instance.trackedPlinths.ContainsKey(id))
             {
-                Debug.Log($"[PlinthMonitor] already tracking plinth {type} ({holderGO.name})");
+                Plugin.Log.LogInfo($"PlinthMonitor: already tracking plinth {type} ({holderGO.name})");
                 return;
             }
 
             var slot = new PlinthSlot { holderGO = holderGO, meshGO = meshGO, type = type };
             Instance.trackedPlinths[id] = slot;
-            Debug.Log($"[PlinthMonitor] registered plinth slot {type}");
+            Plugin.Log.LogInfo($"PlinthMonitor: registered plinth slot {type}");
 
             var app = MenuCustomizationApplication.Instance;
             if (app != null && app.HasPlinthApplied)

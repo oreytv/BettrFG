@@ -65,7 +65,7 @@ namespace BetterFG.Tweaks
             Add<ImmediateRespawnTweak>(TweakCategory.Gameplay);
 
             // ── Audio ──
-            Add<spectatorMusicTweak>(TweakCategory.Audio);
+            Add<SpectatorMusicTweak>(TweakCategory.Audio);
             Add<MuteSocialSoundsTweak>(TweakCategory.Audio);
             Add<BringBackFallGuyNoisesTweak>(TweakCategory.Audio);
 

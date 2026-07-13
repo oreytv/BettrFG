@@ -145,11 +145,11 @@ namespace BetterFG.Tweaks
             if (tweak != null && tweak.IsEnabled)
             {
                 try { tweak.EnableTweak(); }
-                catch (Exception ex) { Plugin.Log?.LogWarning("[ChangeFallGuysLogo] reapply failed " + ex.Message); }
+                catch (Exception ex) { Plugin.Log?.LogWarning("ChangeFallGuysLogo: reapply failed " + ex.Message); }
             }
 
             try { Customization.Menu.MenuCustomizationApplication.Instance?.ReapplyTitleScreenBg(); }
-            catch (Exception ex) { Plugin.Log?.LogWarning("[ChangeFallGuysLogo] title bg reapply failed " + ex.Message); }
+            catch (Exception ex) { Plugin.Log?.LogWarning("ChangeFallGuysLogo: title bg reapply failed " + ex.Message); }
         }
     }
 }

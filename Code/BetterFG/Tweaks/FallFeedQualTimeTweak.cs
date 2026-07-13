@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using BetterFG.Features.TimePlacement;
 using FGClient.FallFeed;
 
@@ -46,7 +46,7 @@ namespace BetterFG.Tweaks
             }
             catch (Exception ex)
             {
-                UnityEngine.Debug.LogWarning("[FallFeed] qualtime " + ex.Message);
+                Plugin.Log.LogWarning("FallFeed: qualtime " + ex.Message);
             }
         }
 

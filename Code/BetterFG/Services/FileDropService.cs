@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Runtime.InteropServices;
 using System.Text;
 #if PROFILES
@@ -36,7 +36,7 @@ namespace BetterFG.Services
 
         [DllImport("shell32.dll")]
         private static extern void DragFinish(IntPtr hDrop);
-
+            
         [DllImport("user32.dll")]
         private static extern IntPtr GetActiveWindow();
 
@@ -55,7 +55,7 @@ namespace BetterFG.Services
             _hwnd = GetActiveWindow();
             if (_hwnd == IntPtr.Zero)
             {
-                Debug.LogWarning("[FileDrop] no active window yet, skipping");
+                Plugin.Log.LogWarning("FileDrop: no active window yet, skipping");
                 return;
             }
 
@@ -65,9 +65,9 @@ namespace BetterFG.Services
                 _origWndProc = SetWindowLongPtr(_hwnd, GWLP_WNDPROC, _hook);
                 DragAcceptFiles(_hwnd, true);
                 _installed = true;
-                Debug.Log("[FileDrop] drag-drop hook installed");
+                Plugin.Log.LogInfo("FileDrop: drag-drop hook installed");
             }
-            catch (Exception ex) { Debug.LogError("[FileDrop] install failed: " + ex.Message); }
+            catch (Exception ex) { Plugin.Log.LogError("drag-drop install failed: " + ex.Message); }
 #endif
         }
 
@@ -76,7 +76,7 @@ namespace BetterFG.Services
             if (msg == WM_DROPFILES)
             {
                 try { HandleDrop(wParam); }
-                catch (Exception ex) { Debug.LogError("[FileDrop] handle: " + ex.Message); }
+                catch (Exception ex) { Plugin.Log.LogError("FileDrop: handle: " + ex.Message); }
             }
             return CallWindowProc(_origWndProc, hWnd, msg, wParam, lParam);
         }
@@ -98,7 +98,7 @@ namespace BetterFG.Services
                 {
 #if PROFILES
                     string name = ProfileService.ImportOverwriteByPlayerName(captured);
-                    Debug.Log($"[FileDrop] imported profile '{name}' from drop");
+                    Plugin.Log.LogInfo($"FileDrop: imported profile '{name}' from drop");
                     ProfilesWindow.RefreshOpen();
 #endif
                 });

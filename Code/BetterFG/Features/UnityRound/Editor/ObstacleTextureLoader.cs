@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -361,7 +361,7 @@ namespace BetterFG.Features.UnityRound.Editor
                         _overrides[pair.Key] = png; // SetOverride already saved, but keep map consistent
                 }
             }
-            catch (Exception ex) { Debug.LogWarning($"[ObstacleTextureLoader] load failed: {ex.Message}"); }
+            catch (Exception ex) { Plugin.Log.LogWarning($"ObstacleTextureLoader: load failed: {ex.Message}"); }
         }
 
         // current round's texture.json path; null until a round is loaded
@@ -393,7 +393,7 @@ namespace BetterFG.Features.UnityRound.Editor
                 sb.AppendLine("}");
                 File.WriteAllText(_jsonPath, sb.ToString(), Encoding.UTF8);
             }
-            catch (Exception ex) { Debug.LogWarning($"[ObstacleTextureLoader] save failed: {ex.Message}"); }
+            catch (Exception ex) { Plugin.Log.LogWarning($"ObstacleTextureLoader: save failed: {ex.Message}"); }
         }
 
         // tiny flat string:string json parser (texture.json is only ever a flat map)

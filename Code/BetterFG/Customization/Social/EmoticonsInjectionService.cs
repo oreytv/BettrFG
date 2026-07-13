@@ -70,7 +70,7 @@ namespace BetterFG.Customization.Social
                 output.Play();
                 output.PlaybackStopped += (_, __) => { output.Dispose(); reader.Dispose(); ms.Dispose(); };
             }
-            catch (Exception ex) { Debug.LogWarning($"[EmoticonInjection] sound play failed: {ex.Message}"); }
+            catch (Exception ex) { Plugin.Log.LogWarning($"EmoticonInjection: sound play failed: {ex.Message}"); }
         }
 
         private static float GetVolume()
@@ -125,7 +125,7 @@ namespace BetterFG.Customization.Social
                 Remap.Clear();
                 SoundOwner.Clear();
             }
-            catch (Exception ex) { Debug.LogError($"[EmoticonInjection] restore: {ex}"); }
+            catch (Exception ex) { Plugin.Log.LogError($"EmoticonInjection: restore: {ex}"); }
         }
 
         internal static void InjectSlots(SocialPrimeHandler handler = null)
@@ -230,7 +230,7 @@ namespace BetterFG.Customization.Social
             catch (Exception ex)
             {
                 LastStatus = $"Error: {ex.Message}";
-                Debug.LogError($"[EmoticonInjection] {ex}");
+                Plugin.Log.LogError($"EmoticonInjection: {ex}");
             }
         }
 

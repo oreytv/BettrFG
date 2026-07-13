@@ -163,7 +163,7 @@ namespace BetterFG.Customization.Player
                 }
             }
 
-            Debug.Log($"[CostumePoller] HideRemoteBeans chosen donor={ (boneDonor != null ? boneDonor.name : "(none)") }");
+            Plugin.Log.LogInfo($"CostumePoller: HideRemoteBeans chosen donor={ (boneDonor != null ? boneDonor.name : "(none)") }");
         }
 
         private void HideLocalBeans()

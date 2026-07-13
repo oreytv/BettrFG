@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using BetterFG.Customization.Menu;
@@ -47,9 +47,9 @@ namespace BetterFG.Customization.Presets
                 foreach (var kv in SettingsService.Snapshot(PREFIXES))
                     lines.Add(kv.Key + "=" + kv.Value);
                 File.WriteAllLines(Path.Combine(Dir, name + ".txt"), lines);
-                Debug.Log("[Presets] saved " + name);
+                Plugin.Log.LogInfo("Presets: saved " + name);
             }
-            catch (Exception ex) { Debug.LogError("[Presets] save failed: " + ex.Message); }
+            catch (Exception ex) { Plugin.Log.LogError("Presets: save failed: " + ex.Message); }
         }
 
         public static void Load(string name)
@@ -67,7 +67,7 @@ namespace BetterFG.Customization.Presets
                     values[line.Substring(0, eq).Trim()] = line.Substring(eq + 1).Trim();
                 }
             }
-            catch (Exception ex) { Debug.LogError("[Presets] load failed: " + ex.Message); return; }
+            catch (Exception ex) { Plugin.Log.LogError("Presets: load failed: " + ex.Message); return; }
 
             SettingsService.ReplacePrefixed(PREFIXES, values);
 
@@ -117,7 +117,7 @@ namespace BetterFG.Customization.Presets
             // values take effect without waiting for the next fade-in.
             LoadingScreenBg.ReapplyActive();
 
-            Debug.Log("[Presets] loaded " + name);
+            Plugin.Log.LogInfo("Presets: loaded " + name);
         }
 
         public static void Delete(string name)
@@ -127,7 +127,7 @@ namespace BetterFG.Customization.Presets
                 string path = Path.Combine(Dir, Sanitize(name) + ".txt");
                 if (File.Exists(path)) File.Delete(path);
             }
-            catch (Exception ex) { Debug.LogError("[Presets] delete failed: " + ex.Message); }
+            catch (Exception ex) { Plugin.Log.LogError("Presets: delete failed: " + ex.Message); }
         }
 
         private static string Sanitize(string name)

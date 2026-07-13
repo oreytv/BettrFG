@@ -201,7 +201,7 @@ namespace BetterFG.Nametag
 
         // ── Remote platform icon ──────────────────────────────────────────────
 
-        public static void ApplyRemotePlatformIcon(NameTagViewModel vm, remoteNametagInfo info)
+        public static void ApplyRemotePlatformIcon(NameTagViewModel vm, RemoteNametagInfo info)
         {
             if (vm == null || info == null) return;
 
@@ -250,7 +250,7 @@ namespace BetterFG.Nametag
             }
             catch (Exception ex)
             {
-                Debug.LogWarning("[NametagIcon] renderqueue pass " + ex.Message);
+                Plugin.Log.LogWarning("NametagIcon: renderqueue pass " + ex.Message);
             }
         }
 
@@ -284,7 +284,7 @@ namespace BetterFG.Nametag
             }
             catch (Exception ex)
             {
-                Debug.LogWarning("[NametagIcon] platform pass " + ex.Message);
+                Plugin.Log.LogWarning("NametagIcon: platform pass " + ex.Message);
             }
         }
 
@@ -314,7 +314,7 @@ namespace BetterFG.Nametag
             }
             catch (Exception ex)
             {
-                Debug.LogWarning("[NametagIcon] platform row " + ex.Message);
+                Plugin.Log.LogWarning("NametagIcon: platform row " + ex.Message);
             }
         }
 
@@ -344,7 +344,7 @@ namespace BetterFG.Nametag
             }
             catch (Exception ex)
             {
-                Debug.LogWarning("[NametagIcon] platform text " + ex.Message);
+                Plugin.Log.LogWarning("NametagIcon: platform text " + ex.Message);
             }
         }
 
@@ -433,7 +433,7 @@ namespace BetterFG.Nametag
             }
             catch (Exception ex)
             {
-                Debug.LogWarning("[NametagIcon] platform restore " + ex.Message);
+                Plugin.Log.LogWarning("NametagIcon: platform restore " + ex.Message);
             }
         }
 
@@ -477,7 +477,7 @@ namespace BetterFG.Nametag
             }
             catch (Exception ex)
             {
-                Debug.LogWarning("[NametagIcon] playerkey " + ex.Message);
+                Plugin.Log.LogWarning("NametagIcon: playerkey " + ex.Message);
             }
 
             return "";
@@ -529,7 +529,7 @@ namespace BetterFG.Nametag
             {
                 var asm = Assembly.GetExecutingAssembly();
                 using var stream = asm.GetManifestResourceStream(resourceName);
-                if (stream == null) { Debug.LogError($"[NametagIcon] missing resource {resourceName}"); return null; }
+                if (stream == null) { Plugin.Log.LogError($"NametagIcon: missing resource {resourceName}"); return null; }
                 var bytes = new byte[stream.Length];
                 stream.Read(bytes, 0, bytes.Length);
                 var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
@@ -537,7 +537,7 @@ namespace BetterFG.Nametag
                 tex.Apply();
                 cache = tex;
             }
-            catch (Exception ex) { Debug.LogError($"[NametagIcon] LoadEmbeddedReadable {resourceName}: {ex.Message}"); }
+            catch (Exception ex) { Plugin.Log.LogError($"NametagIcon: LoadEmbeddedReadable {resourceName}: {ex.Message}"); }
             return cache;
         }
 
@@ -630,7 +630,7 @@ namespace BetterFG.Nametag
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[NametagIcon] BuildBackingSprite {path}: {ex.Message}");
+                Plugin.Log.LogError($"NametagIcon: BuildBackingSprite {path}: {ex.Message}");
                 return null;
             }
         }
@@ -805,7 +805,7 @@ namespace BetterFG.Nametag
 
             Sprite sprite = ResolveIconSprite(cfg.iconMode, cfg.iconCountry ?? "", cfg.iconPath ?? "");
             if (sprite == null) return;
-            if (nameAndCrown == null) { Debug.Log("[NametagIcon] NameAndCrownParent not found"); return; }
+            if (nameAndCrown == null) { Plugin.Log.LogInfo("NametagIcon: NameAndCrownParent not found"); return; }
             AttachIcon(nameAndCrown, sprite);
         }
 
@@ -870,7 +870,7 @@ namespace BetterFG.Nametag
 
         // ── UI nameplate — remote ─────────────────────────────────────────────
 
-        public static void ApplyRemoteToNameplate(TMPro.TextMeshPro tmp3d, string fallbackName, remoteNametagInfo info)
+        public static void ApplyRemoteToNameplate(TMPro.TextMeshPro tmp3d, string fallbackName, RemoteNametagInfo info)
         {
             if (tmp3d == null || info == null) return;
             BetterFG.Customization.Menu.FontReplacementService.ProtectText(tmp3d);
@@ -932,7 +932,7 @@ namespace BetterFG.Nametag
                     .WrapToIl2Cpp());
         }
 
-        public static void ApplyRemoteToNameplate(TMPro.TextMeshProUGUI tmp, string fallbackName, remoteNametagInfo info)
+        public static void ApplyRemoteToNameplate(TMPro.TextMeshProUGUI tmp, string fallbackName, RemoteNametagInfo info)
         {
             if (tmp == null || info == null) return;
             BetterFG.Customization.Menu.FontReplacementService.ProtectText(tmp);
@@ -952,7 +952,7 @@ namespace BetterFG.Nametag
             AttachUIIcon(tmp, sprite, NameplateType.Regular, info.iconMode, info.iconPath, info.iconScale, info.iconOffX, info.iconOffY);
         }
 
-        public static void ApplyRemoteToNameplate(TMP_Text tmp, string fallbackName, remoteNametagInfo info)
+        public static void ApplyRemoteToNameplate(TMP_Text tmp, string fallbackName, RemoteNametagInfo info)
         {
             if (tmp == null || info == null) return;
             var ui = tmp.TryCast<TextMeshProUGUI>();
@@ -961,7 +961,7 @@ namespace BetterFG.Nametag
             if (world != null) { ApplyRemoteToNameplate(world, fallbackName, info); return; }
         }
 
-        public static void ApplyRemoteToDisplay(PlayerInfoDisplay display, string fallbackName, remoteNametagInfo info)
+        public static void ApplyRemoteToDisplay(PlayerInfoDisplay display, string fallbackName, RemoteNametagInfo info)
         {
             if (display == null || info == null) return;
             var tmp = TryGetNameText(display);
@@ -1661,7 +1661,7 @@ namespace BetterFG.Nametag
                         crown.localPosition = new Vector3(crownX, crown.localPosition.y, crown.localPosition.z);
                 }
             }
-            catch (Exception ex) { Debug.LogWarning($"[NametagIcon] reposition aborted: {ex.Message}"); }
+            catch (Exception ex) { Plugin.Log.LogWarning($"NametagIcon: reposition aborted: {ex.Message}"); }
         }
 
         // re-place the local crown counter using the same centred formula the icon reposition uses (name +
@@ -1719,7 +1719,7 @@ namespace BetterFG.Nametag
                 stream.Read(data, 0, data.Length);
                 return BytesToSprite(data, resize: false);
             }
-            catch (Exception ex) { Debug.LogError($"[NametagIcon] LoadEmbeddedFlag {isoCode}: {ex.Message}"); return null; }
+            catch (Exception ex) { Plugin.Log.LogError($"NametagIcon: LoadEmbeddedFlag {isoCode}: {ex.Message}"); return null; }
         }
 
         internal static Sprite LoadFileSprite(string path)
@@ -1734,7 +1734,7 @@ namespace BetterFG.Nametag
                 }
                 return BytesToSprite(File.ReadAllBytes(path), resize: true);
             }
-            catch (Exception ex) { Debug.LogError($"[NametagIcon] LoadFileSprite {path}: {ex.Message}"); return null; }
+            catch (Exception ex) { Plugin.Log.LogError($"NametagIcon: LoadFileSprite {path}: {ex.Message}"); return null; }
         }
 
         // Per-path cache of decoded GIF frame sprites + delays (decoding is expensive).
@@ -1789,7 +1789,7 @@ namespace BetterFG.Nametag
                 anim.SourcePath = path;
                 anim.Init(frames, GetGifDelays(path), sr, img);
             }
-            catch (Exception ex) { Debug.LogError($"[NametagIcon] gif animator: {ex.Message}"); }
+            catch (Exception ex) { Plugin.Log.LogError($"NametagIcon: gif animator: {ex.Message}"); }
         }
 
         private static Sprite BytesToSprite(byte[] data, bool resize)

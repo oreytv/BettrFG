@@ -18,6 +18,5 @@ _creator_deploy_test/
 *.md
 Code/BetterFG.Installer/payload_src
 Code/BetterFG/Customization/Profiles/
-Code/BetterFG/Network/RemoteProfileStore.cs
 Code/BetterFG/UI/Windows/ProfilesWindow.cs
 Code/BetterFG/Patches/PatchEAC.cs

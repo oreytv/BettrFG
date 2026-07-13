@@ -90,7 +90,7 @@ namespace BetterFG.Features.UnityRound
 
             if (Instance == null)
             {
-                Debug.LogError("[BetterFGUnityRounds] Instance is null, not spawned");
+                Plugin.Log.LogError("BetterFGUnityRounds: Instance is null, not spawned");
                 return false;
             }
 
@@ -99,13 +99,13 @@ namespace BetterFG.Features.UnityRound
             {
                 if (_roundLoadBusy)
                 {
-                    Debug.Log($"[BetterFGUnityRounds] already loading {key}, skipping duplicate");
+                    Plugin.Log.LogInfo($"BetterFGUnityRounds: already loading {key}, skipping duplicate");
                     return true;
                 }
 
                 if (_pendingPrefab != null || ActiveRound != null)
                 {
-                    Debug.Log($"[BetterFGUnityRounds] already have {key}, skipping duplicate");
+                    Plugin.Log.LogInfo($"BetterFGUnityRounds: already have {key}, skipping duplicate");
                     InstantiateQueuedRound();
                     return true;
                 }
@@ -169,7 +169,7 @@ namespace BetterFG.Features.UnityRound
             RenderSettings.fogColor = _oldFogColor;
             RenderSettings.skybox = _oldSkybox;
             _savedRenderSettings = false;
-            Debug.Log("[BetterFGUnityRounds] environment restored");
+            Plugin.Log.LogInfo("BetterFGUnityRounds: environment restored");
         }
 
         public static void SaveEnvironmentIfNeeded()
@@ -196,11 +196,11 @@ namespace BetterFG.Features.UnityRound
         {
             if (fgcc == null) return;
             var pos = GetRandomSpawnpointPos();
-            if (pos == null) { Debug.LogWarning("[BetterFGUnityRounds] TeleportPlayerToRandomSpawn: no spawnpoints"); return; }
+            if (pos == null) { Plugin.Log.LogWarning("BetterFGUnityRounds: TeleportPlayerToRandomSpawn: no spawnpoints"); return; }
             var teleport = fgcc.TeleportMotorFunction;
-            if (teleport == null) { Debug.LogWarning("[BetterFGUnityRounds] TeleportPlayerToRandomSpawn: no TeleportMotorFunction"); return; }
+            if (teleport == null) { Plugin.Log.LogWarning("BetterFGUnityRounds: TeleportPlayerToRandomSpawn: no TeleportMotorFunction"); return; }
             teleport.TeleportPosition = pos.Value;
-            Debug.Log($"[BetterFGUnityRounds] teleporting to {pos.Value}");
+            Plugin.Log.LogInfo($"BetterFGUnityRounds: teleporting to {pos.Value}");
         }
 
         public static bool TeleportBeanToSpawn(GameObject bean, string reason = "spawn")
@@ -227,7 +227,7 @@ namespace BetterFG.Features.UnityRound
                 rb.angularVelocity = Vector3.zero;
             }
 
-            Debug.Log($"[BetterFGUnityRounds] {reason}: '{bean.name}' -> spawnpoint {idx}/{ActiveSpawnpoints.Length} ({target.name})");
+            Plugin.Log.LogInfo($"BetterFGUnityRounds: {reason}: '{bean.name}' -> spawnpoint {idx}/{ActiveSpawnpoints.Length} ({target.name})");
             return true;
         }
 
@@ -240,7 +240,7 @@ namespace BetterFG.Features.UnityRound
                     yield break;
                 yield return null;
             }
-            Debug.LogWarning("[BetterFGUnityRounds] late spawn: no local bean/spawnpoints");
+            Plugin.Log.LogWarning("BetterFGUnityRounds: late spawn: no local bean/spawnpoints");
         }
 
         static int StableHash(string s)
@@ -276,7 +276,7 @@ namespace BetterFG.Features.UnityRound
 
             if (!targetScene.IsValid())
             {
-                Debug.LogError("[BetterFGUnityRounds] no fraggle scene found, aborting");
+                Plugin.Log.LogError("BetterFGUnityRounds: no fraggle scene found, aborting");
                 return;
             }
 
@@ -294,7 +294,7 @@ namespace BetterFG.Features.UnityRound
             ActiveRound = instance;
             _pendingPrefab = null;
 
-            Debug.Log($"[BetterFGUnityRounds] instantiated '{instance.name}' into '{targetScene.name}'");
+            Plugin.Log.LogInfo($"BetterFGUnityRounds: instantiated '{instance.name}' into '{targetScene.name}'");
 
             BetterFGRoundPostmodifier.Apply(ActiveRound, ActiveMapInfo, ref _pendingSkybox);
             if (!string.IsNullOrEmpty(_pendingTextureJson) && Instance != null)
@@ -318,7 +318,7 @@ namespace BetterFG.Features.UnityRound
 
         private static void Notify(string text, Color color)
         {
-            Debug.Log($"[BetterFGUnityRounds] {text}");
+            Plugin.Log.LogInfo($"BetterFGUnityRounds: {text}");
             try { BetterFG.UI.BetterFGNotif.CreateNotification(text, color); } catch { }
         }
 
@@ -433,7 +433,7 @@ namespace BetterFG.Features.UnityRound
 
             _originalMusicBankName = null;
             _originalMusicEventName = null;
-            Debug.Log("[BetterFGUnityRounds] music restored");
+            Plugin.Log.LogInfo("BetterFGUnityRounds: music restored");
         }
 
         // Phase 1 -- download, cache prefab + skybox. Never touches scene objects.
@@ -448,7 +448,7 @@ namespace BetterFG.Features.UnityRound
             string rawBase = $"https://raw.githubusercontent.com/{owner}/{repo}/main/Rounds/{round}";
             string infoUrl = $"{rawBase}/info.json";
 
-            Debug.Log($"[BetterFGUnityRounds] fetching {infoUrl}");
+            Plugin.Log.LogInfo($"BetterFGUnityRounds: fetching {infoUrl}");
 
             var infoReq = UnityWebRequest.Get(infoUrl);
             yield return infoReq.SendWebRequest();
@@ -456,7 +456,7 @@ namespace BetterFG.Features.UnityRound
 
             if (infoReq.result != UnityWebRequest.Result.Success)
             {
-                Debug.LogError($"[BetterFGUnityRounds] info.json fetch failed: {infoReq.error}");
+                Plugin.Log.LogError($"BetterFGUnityRounds: info.json fetch failed: {infoReq.error}");
                 infoReq.Dispose();
                 _roundLoadBusy = false;
                 yield break;
@@ -467,7 +467,7 @@ namespace BetterFG.Features.UnityRound
 
             if (info == null || string.IsNullOrEmpty(info.file) || string.IsNullOrEmpty(info.prefab))
             {
-                Debug.LogError("[BetterFGUnityRounds] invalid info.json");
+                Plugin.Log.LogError("BetterFGUnityRounds: invalid info.json");
                 _roundLoadBusy = false;
                 yield break;
             }
@@ -484,13 +484,13 @@ namespace BetterFG.Features.UnityRound
             var alreadyLoadedBundle = FindLoadedBundleWithAsset(info.prefab);
             if (alreadyLoadedBundle != null)
             {
-                Debug.Log($"[BetterFGUnityRounds] reusing already loaded bundle for '{info.prefab}'");
+                Plugin.Log.LogInfo($"BetterFGUnityRounds: reusing already loaded bundle for '{info.prefab}'");
                 yield return CacheRoundFromBundle(alreadyLoadedBundle, info, ticket, owned: false).WrapToIl2Cpp();
                 yield break;
             }
 
             string bundleUrl = $"{rawBase}/{info.file}";
-            Debug.Log($"[BetterFGUnityRounds] downloading bundle {bundleUrl}");
+            Plugin.Log.LogInfo($"BetterFGUnityRounds: downloading bundle {bundleUrl}");
 
             var bundleReq = UnityWebRequest.Get(bundleUrl);
             yield return bundleReq.SendWebRequest();
@@ -498,7 +498,7 @@ namespace BetterFG.Features.UnityRound
 
             if (bundleReq.result != UnityWebRequest.Result.Success)
             {
-                Debug.LogError($"[BetterFGUnityRounds] bundle fetch failed: {bundleReq.error}");
+                Plugin.Log.LogError($"BetterFGUnityRounds: bundle fetch failed: {bundleReq.error}");
                 bundleReq.Dispose();
                 _roundLoadBusy = false;
                 yield break;
@@ -517,11 +517,11 @@ namespace BetterFG.Features.UnityRound
 
             if (loadEx != null)
             {
-                Debug.LogError($"[BetterFGUnityRounds] LoadFromMemory failed: {loadEx.Message}");
+                Plugin.Log.LogError($"BetterFGUnityRounds: LoadFromMemory failed: {loadEx.Message}");
                 bundle = FindLoadedBundleWithAsset(info.prefab);
                 if (bundle != null)
                 {
-                    Debug.Log($"[BetterFGUnityRounds] LoadFromMemory failed but prefab is already loaded, reusing '{info.prefab}'");
+                    Plugin.Log.LogInfo($"BetterFGUnityRounds: LoadFromMemory failed but prefab is already loaded, reusing '{info.prefab}'");
                     yield return CacheRoundFromBundle(bundle, info, ticket, owned: false).WrapToIl2Cpp();
                     yield break;
                 }
@@ -534,12 +534,12 @@ namespace BetterFG.Features.UnityRound
                 bundle = FindLoadedBundleWithAsset(info.prefab);
                 if (bundle != null)
                 {
-                    Debug.Log($"[BetterFGUnityRounds] AssetBundle was null but prefab is already loaded, reusing '{info.prefab}'");
+                    Plugin.Log.LogInfo($"BetterFGUnityRounds: AssetBundle was null but prefab is already loaded, reusing '{info.prefab}'");
                     yield return CacheRoundFromBundle(bundle, info, ticket, owned: false).WrapToIl2Cpp();
                     yield break;
                 }
 
-                Debug.LogError("[BetterFGUnityRounds] AssetBundle is null after load");
+                Plugin.Log.LogError("BetterFGUnityRounds: AssetBundle is null after load");
                 _roundLoadBusy = false;
                 yield break;
             }
@@ -563,11 +563,11 @@ namespace BetterFG.Features.UnityRound
             if (req.result == UnityWebRequest.Result.Success)
             {
                 RoundMusicService.SetPending(req.downloadHandler.data, path);
-                Debug.Log($"[BetterFGUnityRounds] round music '{musicFile}' ready");
+                Plugin.Log.LogInfo($"BetterFGUnityRounds: round music '{musicFile}' ready");
             }
             else
             {
-                Debug.Log($"[BetterFGUnityRounds] no round music ({req.responseCode})");
+                Plugin.Log.LogInfo($"BetterFGUnityRounds: no round music ({req.responseCode})");
             }
             req.Dispose();
         }
@@ -583,11 +583,11 @@ namespace BetterFG.Features.UnityRound
             if (req.result == UnityWebRequest.Result.Success)
             {
                 _pendingTextureJson = req.downloadHandler.text;
-                Debug.Log("[BetterFGUnityRounds] texture.json ready");
+                Plugin.Log.LogInfo("BetterFGUnityRounds: texture.json ready");
             }
             else
             {
-                Debug.Log($"[BetterFGUnityRounds] no texture.json for round ({req.responseCode})");
+                Plugin.Log.LogInfo($"BetterFGUnityRounds: no texture.json for round ({req.responseCode})");
             }
 
             req.Dispose();
@@ -610,13 +610,13 @@ namespace BetterFG.Features.UnityRound
                 if (req.result == UnityWebRequest.Result.Success)
                 {
                     if (ObstacleTextureLoader.SetOverrideBytes(pair.Key, req.downloadHandler.data, url, out string error))
-                        Debug.Log($"[BetterFGUnityRounds] applied texture {pair.Key}");
+                        Plugin.Log.LogInfo($"BetterFGUnityRounds: applied texture {pair.Key}");
                     else
-                        Debug.LogWarning($"[BetterFGUnityRounds] texture {pair.Key}: {error}");
+                        Plugin.Log.LogWarning($"BetterFGUnityRounds: texture {pair.Key}: {error}");
                 }
                 else
                 {
-                    Debug.LogWarning($"[BetterFGUnityRounds] texture fetch failed {url}: {req.error}");
+                    Plugin.Log.LogWarning($"BetterFGUnityRounds: texture fetch failed {url}: {req.error}");
                 }
 
                 req.Dispose();
@@ -636,16 +636,16 @@ namespace BetterFG.Features.UnityRound
 
             if (prefabReq.asset == null)
             {
-                Debug.LogError($"[BetterFGUnityRounds] prefab '{info.prefab}' not found in bundle");
+                Plugin.Log.LogError($"BetterFGUnityRounds: prefab '{info.prefab}' not found in bundle");
                 _roundLoadBusy = false;
                 yield break;
             }
 
             GameObject prefab;
             try { prefab = prefabReq.asset.Cast<GameObject>(); }
-            catch (Exception ex) { Debug.LogError($"[BetterFGUnityRounds] prefab cast failed: {ex.Message}"); _roundLoadBusy = false; yield break; }
+            catch (Exception ex) { Plugin.Log.LogError($"BetterFGUnityRounds: prefab cast failed: {ex.Message}"); _roundLoadBusy = false; yield break; }
 
-            if (prefab == null) { Debug.LogError("[BetterFGUnityRounds] prefab is null after cast"); _roundLoadBusy = false; yield break; }
+            if (prefab == null) { Plugin.Log.LogError("BetterFGUnityRounds: prefab is null after cast"); _roundLoadBusy = false; yield break; }
 
             _pendingPrefab = prefab;
 
@@ -660,17 +660,17 @@ namespace BetterFG.Features.UnityRound
                     try
                     {
                         _pendingSkybox = skyReq.asset.Cast<Material>();
-                        Debug.Log($"[BetterFGUnityRounds] skybox '{info.skybox}' loaded");
+                        Plugin.Log.LogInfo($"BetterFGUnityRounds: skybox '{info.skybox}' loaded");
                     }
-                    catch (Exception ex) { Debug.LogWarning($"[BetterFGUnityRounds] skybox cast failed: {ex.Message}"); }
+                    catch (Exception ex) { Plugin.Log.LogWarning($"BetterFGUnityRounds: skybox cast failed: {ex.Message}"); }
                 }
                 else
                 {
-                    Debug.LogWarning($"[BetterFGUnityRounds] skybox '{info.skybox}' not found in bundle");
+                    Plugin.Log.LogWarning($"BetterFGUnityRounds: skybox '{info.skybox}' not found in bundle");
                 }
             }
 
-            Debug.Log($"[BetterFGUnityRounds] bundle ready, waiting for scene -- prefab '{prefab.name}'");
+            Plugin.Log.LogInfo($"BetterFGUnityRounds: bundle ready, waiting for scene -- prefab '{prefab.name}'");
             _roundLoadBusy = false;
             InstantiateQueuedRound();
         }
@@ -701,7 +701,7 @@ namespace BetterFG.Features.UnityRound
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[BetterFGUnityRounds] loaded bundle scan failed: {ex.Message}");
+                Plugin.Log.LogWarning($"BetterFGUnityRounds: loaded bundle scan failed: {ex.Message}");
             }
 
             return null;

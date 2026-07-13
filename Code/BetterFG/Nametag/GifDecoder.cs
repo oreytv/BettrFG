@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using UnityEngine;
 
@@ -161,7 +161,7 @@ namespace BetterFG.Nametag
             }
             catch (Exception ex)
             {
-                Debug.LogError("[GifDecoder] decode failed: " + ex.Message);
+                Plugin.Log.LogError("GifDecoder: decode failed: " + ex.Message);
                 return null;
             }
         }

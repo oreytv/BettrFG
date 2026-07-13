@@ -1,1 +1,1 @@
-namespace BetterFG.Core { public static partial class BetterFGInfo { public const string BuildHash = "f5187891f03be874"; } }
+namespace BetterFG.Core { public static partial class BetterFGInfo { public const string BuildHash = "267f7b3b0ea42f8d"; } }

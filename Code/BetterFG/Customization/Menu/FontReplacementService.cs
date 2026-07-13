@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using TMPro;
@@ -67,7 +67,7 @@ namespace BetterFG.Customization.Menu
                     if (!names.Contains(fa.name)) names.Add(fa.name);
                 }
             }
-            catch (Exception ex) { Debug.LogWarning("[BetterFG] enumerate fonts: " + ex.Message); }
+            catch (Exception ex) { Plugin.Log.LogWarning("BetterFG: enumerate fonts: " + ex.Message); }
             names.Sort(StringComparer.OrdinalIgnoreCase);
             return names;
         }
@@ -104,7 +104,7 @@ namespace BetterFG.Customization.Menu
         {
             if (string.IsNullOrEmpty(ov.fontPath) || !File.Exists(ov.fontPath))
             {
-                Debug.LogError("[BetterFG] font file missing: " + ov.fontPath);
+                Plugin.Log.LogError("BetterFG: font file missing: " + ov.fontPath);
                 return null;
             }
 
@@ -117,7 +117,7 @@ namespace BetterFG.Customization.Menu
                     ATLAS_PADDING, GlyphRenderMode.SDFAA, ATLAS_SIZE, ATLAS_SIZE);
                 if (asset == null)
                 {
-                    Debug.LogError("[BetterFG] CreateFontAsset returned null for " + ov.fontPath);
+                    Plugin.Log.LogError("BetterFG: CreateFontAsset returned null for " + ov.fontPath);
                     return null;
                 }
                 asset.hideFlags = HideFlags.HideAndDontSave;
@@ -127,7 +127,7 @@ namespace BetterFG.Customization.Menu
             }
             catch (Exception ex)
             {
-                Debug.LogError("[BetterFG] BuildAsset failed: " + ex);
+                Plugin.Log.LogError("BetterFG: BuildAsset failed: " + ex);
                 return null;
             }
         }
@@ -496,7 +496,7 @@ namespace BetterFG.Customization.Menu
                 _derived[key] = mat;
                 return mat;
             }
-            catch (Exception ex) { Debug.LogWarning("[BFGFont] derive: " + ex.Message); return fontDefault; }
+            catch (Exception ex) { Plugin.Log.LogWarning("BFGFont: derive: " + ex.Message); return fontDefault; }
         }
 
         // ── apply ─────────────────────────────────────────────────────────────
@@ -624,7 +624,7 @@ namespace BetterFG.Customization.Menu
                 foreach (var t in UnityEngine.Object.FindObjectsOfType<TMP_Text>(true))
                     TryApplyTo(t);
             }
-            catch (Exception ex) { Debug.LogWarning("[BetterFG] font sweep: " + ex.Message); }
+            catch (Exception ex) { Plugin.Log.LogWarning("BetterFG: font sweep: " + ex.Message); }
         }
 
         // scoped sweep — only the TMPs under one subtree. used on view switches: only the
@@ -638,7 +638,7 @@ namespace BetterFG.Customization.Menu
                 foreach (var t in scope.GetComponentsInChildren<TMP_Text>(true))
                     TryApplyTo(t);
             }
-            catch (Exception ex) { Debug.LogWarning("[BetterFG] font scope sweep: " + ex.Message); }
+            catch (Exception ex) { Plugin.Log.LogWarning("BetterFG: font scope sweep: " + ex.Message); }
         }
 
         // single-TMP path, used by the OnEnable patch so newly spawned text gets swapped too.

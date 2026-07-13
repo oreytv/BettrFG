@@ -1,7 +1,7 @@
 #pragma warning disable CS8981
 namespace BetterFG.Core
 {
-    public static class bettrfgstuff
+    public static class BettrFGMeta
     {
         public const string DisplayName = "BettrFG";
     }

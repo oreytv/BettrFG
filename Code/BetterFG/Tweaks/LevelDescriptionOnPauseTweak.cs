@@ -62,19 +62,21 @@ namespace BetterFG.Tweaks
             _root = new GameObject("BettrFG_LevelDescOnPause");
             var rootRt = _root.AddComponent<RectTransform>();
             rootRt.SetParent(party.transform, false);
-            rootRt.anchorMin = rootRt.anchorMax = rootRt.pivot = new Vector2(1f, 0f);
-            rootRt.anchoredPosition = new Vector2(-40f, 40f);
-            rootRt.sizeDelta = new Vector2(640f, 0f);
+            const float width = 400f;
+            const float bodyH = 280f;
+            const float titleH = 48f;
 
-            const float bodyH = 400f;
+            rootRt.anchorMin = rootRt.anchorMax = rootRt.pivot = new Vector2(1f, 0.5f);
+            rootRt.anchoredPosition = new Vector2(-40f, -400f);
+            rootRt.sizeDelta = new Vector2(width, titleH + bodyH);
 
             var bodyGo = new GameObject("Body");
             var bodyRt = bodyGo.AddComponent<RectTransform>();
             bodyRt.SetParent(rootRt, false);
             // top pinned just under the title, text flows downward from there
             bodyRt.anchorMin = bodyRt.anchorMax = bodyRt.pivot = new Vector2(1f, 1f);
-            bodyRt.anchoredPosition = new Vector2(0f, bodyH);
-            bodyRt.sizeDelta = new Vector2(640f, bodyH);
+            bodyRt.anchoredPosition = new Vector2(0f, -titleH);
+            bodyRt.sizeDelta = new Vector2(width, bodyH);
             _body = bodyGo.AddComponent<TextMeshProUGUI>();
             _body.font = AssetManager.NameFontAsset;
             _body.fontSize = 24f;
@@ -87,9 +89,9 @@ namespace BetterFG.Tweaks
             var titleGo = new GameObject("Title");
             var titleRt = titleGo.AddComponent<RectTransform>();
             titleRt.SetParent(rootRt, false);
-            titleRt.anchorMin = titleRt.anchorMax = titleRt.pivot = new Vector2(1f, 0f);
-            titleRt.anchoredPosition = new Vector2(0f, bodyH + 8f);
-            titleRt.sizeDelta = new Vector2(640f, 48f);
+            titleRt.anchorMin = titleRt.anchorMax = titleRt.pivot = new Vector2(1f, 1f);
+            titleRt.anchoredPosition = new Vector2(0f, 0f);
+            titleRt.sizeDelta = new Vector2(width, titleH);
             var title = titleGo.AddComponent<TextMeshProUGUI>();
             title.font = FontReplacementService.GetFontAssetByName("TitanOne-Expanded SDF (Title)");
             title.fontSize = 32f;

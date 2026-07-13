@@ -67,13 +67,22 @@ namespace BetterFG.Tweaks
             if (_lastShow == show) return;
             _lastShow = show;
 
-            foreach (var kv in _snapshots)
+            // the snapshot has to move with the toggle. if we only SetActive here, the stored actives still
+            // say what NameLayout was at reparent time, and the teardown restore re-asserts THAT for 4s —
+            // toggle names on during the qual screen with them hidden at reparent and every name dies.
+            var keys = new List<Transform>(_snapshots.Keys);
+            foreach (var t in keys)
             {
-                var t = kv.Key;
                 if (t == null) continue;
                 var nameLayout = t.Find("NameLayout");
-                if (nameLayout != null && nameLayout.gameObject.activeSelf != show)
-                    nameLayout.gameObject.SetActive(show);
+                if (nameLayout == null) continue;
+                if (nameLayout.gameObject.activeSelf != show) nameLayout.gameObject.SetActive(show);
+
+                var snap = _snapshots[t];
+                var go = nameLayout.gameObject;
+                for (int i = 0; i < snap.actives.Count; i++)
+                    if (snap.actives[i].go == go) { snap.actives[i] = (go, show); break; }
+                _snapshots[t] = snap;
             }
         }
 

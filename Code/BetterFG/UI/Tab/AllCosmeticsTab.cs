@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
@@ -105,7 +105,7 @@ namespace BetterFG.UI.Tab
                 tex.wrapMode = TextureWrapMode.Clamp;
                 cache = tex;
             }
-            catch (Exception ex) { Debug.LogWarning("[AllCosmeticsTab] bg load fail: " + ex.Message); }
+            catch (Exception ex) { Plugin.Log.LogWarning("AllCosmeticsTab: bg load fail: " + ex.Message); }
             return cache;
         }
 
@@ -639,7 +639,7 @@ namespace BetterFG.UI.Tab
         private void SetStatus(string text)
         {
             if (_status != null) _status.text = text;
-            Debug.Log("[AllCosmeticsTab] " + text);
+            Plugin.Log.LogInfo(text);
         }
     }
 }

@@ -128,7 +128,7 @@ namespace BetterFG.UI.Tab
                 tex.wrapMode = TextureWrapMode.Clamp;
                 cache = tex;
             }
-            catch (Exception ex) { Debug.LogError("[BetterFG] Tex load failed: " + ex.Message); }
+            catch (Exception ex) { Plugin.Log.LogError("BetterFG: Tex load failed: " + ex.Message); }
             return cache;
         }
 
@@ -485,7 +485,7 @@ namespace BetterFG.UI.Tab
                 _bgImgPreview.texture = tex;
                 _bgImgPreview.color = Color.white;
             }
-            catch (Exception ex) { Debug.LogError("[MenuTab] bg img preview failed: " + ex.Message); }
+            catch (Exception ex) { Plugin.Log.LogError("MenuTab: bg img preview failed: " + ex.Message); }
         }
 
         // ── Camera panel ──────────────────────────────────────────────────────

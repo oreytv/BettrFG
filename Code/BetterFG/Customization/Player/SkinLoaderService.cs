@@ -1,10 +1,12 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 using UnityEngine.Networking;
 using BetterFG.Customization.Player;
+using BetterFG.Network;
+using BetterFG.Services;
 using BetterFG.Utilities;
 using BepInEx.Unity.IL2CPP.Utils.Collections;
 
@@ -83,7 +85,7 @@ namespace BetterFG.Customization.Player
         {
             if (!_downloading.Add(skinName))
             {
-                Debug.Log($"[SkinLoader] '{skinName}' already downloading, skipping duplicate request");
+                Plugin.Log.LogInfo($"SkinLoader: '{skinName}' already downloading, skipping duplicate request");
                 return;
             }
             StartCoroutine(DownloadOuterCoroutine(skinName, url, infoUrl).WrapToIl2Cpp());
@@ -200,6 +202,36 @@ namespace BetterFG.Customization.Player
 
             OnSkinLoaded?.Invoke(skinInfo, bundle);
         }
+        // one entry off a profile -> a slot ready for ApplySkinToBean, riding the same disk cache
+        // as the local loadout instead of refetching the bundle + info.json every round
+        public IEnumerator ResolveProfileSlot(RemoteSkinEntry entry, Action<ActiveSkinSlot> done)
+        {
+            SkinType type = SkinTypeParser.FromString(entry.type);
+            if (type == SkinType.Unknown) yield break;
+
+            string category = type == SkinType.Accessory ? "Accessories" : type == SkinType.Item ? "Items" : "Costumes";
+            string repoRaw = RepoRegistry.ResolveRaw(entry.repoUrl);
+            string folder = $"{category}/{entry.file}";
+
+            SkinInfo info = null;
+            AssetBundle bundle = null;
+            Action<SkinInfo, AssetBundle> onLoaded = (i, b) => { if (b != null && i != null && i.file == entry.file) { info = i; bundle = b; } };
+
+            OnSkinLoaded += onLoaded;
+            DownloadSkinWithInfo(entry.file, $"{repoRaw}/{folder}/{entry.file}", $"{repoRaw}/{folder}/info.json");
+
+            float waited = 0f;
+            while (bundle == null && waited < 20f) { yield return null; waited += Time.deltaTime; }
+            OnSkinLoaded -= onLoaded;
+
+            if (bundle == null) { Plugin.Log.LogWarning($"profile skin '{entry.file}' never turned up"); yield break; }
+
+            info.type = entry.type;
+            info.sourceRepo = repoRaw;
+            info.repoFolder = folder;
+            done(new ActiveSkinSlot { skinInfo = info, bundle = bundle, type = type });
+        }
+
         // ── Local folder import ───────────────────────────────────────────────
 
         public void ImportSkinFromFolder(string folderPath)
@@ -311,7 +343,10 @@ namespace BetterFG.Customization.Player
         private SkinInfo ParseSkinInfoWithOffsets(string json)
         {
             var skin = ParseSkinInfo(json);
-            if (skin != null) { skin.boneOffsets = ParseBoneOffsets(json); skin.infoFetched = true; }
+            if (skin == null) return null;
+            skin.boneOffsets = ParseBoneOffsets(json);
+            skin.infoFetched = true;
+            SkinCatalogService.FillItemInfoFromJson(skin, json);
             return skin;
         }
 

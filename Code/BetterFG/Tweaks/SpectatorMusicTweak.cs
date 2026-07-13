@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using FGClient;
 using FGClient.UI.PrivateLobby;
 using HarmonyLib;
@@ -7,15 +7,15 @@ using FgAudioSettings = FGClient.AudioSettings;
 
 namespace BetterFG.Tweaks
 {
-    public class spectatorMusicTweak : BfgTweak
+    public class SpectatorMusicTweak : BfgTweak
     {
-        public spectatorMusicTweak(IntPtr ptr) : base(ptr) { }
+        public SpectatorMusicTweak(IntPtr ptr) : base(ptr) { }
 
         public override string TweakId => "spectator_music";
         public override string TweakLabel => "Spectator Music";
         public override bool DefaultEnabled => true;
 
-        public static spectatorMusicTweak Instance { get; private set; }
+        public static SpectatorMusicTweak Instance { get; private set; }
         private static ClientGameManager _lastGameManager;
         private static bool _lastSpectatorMode;
 
@@ -89,7 +89,7 @@ namespace BetterFG.Tweaks
                     ApplySpectatorFx(raw, WantsMusic && spectating);
                 }
             }
-            catch (Exception ex) { Plugin.Log?.LogWarning("[SpectatorMusicTweak] param failed " + ex.Message); }
+            catch (Exception ex) { Plugin.Log?.LogWarning("SpectatorMusicTweak: param failed " + ex.Message); }
         }
 
         private static void ApplySpectatorFx(FMOD.Studio.EventInstance raw, bool spectating)
@@ -131,7 +131,7 @@ namespace BetterFG.Tweaks
                 var dryVolume = spectating ? 0.6f : 1f;
                 raw.setVolume(dryVolume);
             }
-            catch (Exception ex) { Plugin.Log?.LogWarning("[SpectatorMusicTweak] recreate reverb failed " + ex.Message); }
+            catch (Exception ex) { Plugin.Log?.LogWarning("SpectatorMusicTweak: recreate reverb failed " + ex.Message); }
         }
     }
 

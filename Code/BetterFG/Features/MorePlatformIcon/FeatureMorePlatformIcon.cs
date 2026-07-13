@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using BepInEx.Unity.IL2CPP.Utils.Collections;
@@ -16,9 +16,9 @@ namespace BetterFG.Features.MorePlatformIcon
 {
     internal static class FeatureMorePlatformIcon
     {
-        public static readonly bfgfeature feature = new bfgfeature("moreplatformicon", "More platform icons", true, new List<featuresetting>
+        public static readonly BfgFeature feature = new BfgFeature("moreplatformicon", "More platform icons", true, new List<FeatureSetting>
         {
-            new featuresetting { id = "privatelobby", label = "Private lobby player list", defaultOn = true },
+            new FeatureSetting { id = "privatelobby", label = "Private lobby player list", defaultOn = true },
         }, onClosed: NametagIconApplicator.RestoreKnownPlatformIcons);
 
         const string Res = "BetterFG.assets.ui.feature.moreplatformicon.featuremoreplatformicon_platformicons.png";
@@ -40,7 +40,7 @@ namespace BetterFG.Features.MorePlatformIcon
             "ios_ega", "switch", "win", "linux"
         };
 
-        public static bool On(string setting) => featureRegistry.IsOn("moreplatformicon", setting);
+        public static bool On(string setting) => FeatureRegistry.IsOn("moreplatformicon", setting);
         public static bool Enabled => feature.enabled;
         public static string[] PlatformIconIds() => (string[])_names.Clone();
 
@@ -221,7 +221,7 @@ namespace BetterFG.Features.MorePlatformIcon
             }
             catch (Exception ex)
             {
-                Debug.LogWarning("[PrivateLobbyName] list " + ex.Message);
+                Plugin.Log.LogWarning("PrivateLobbyName: list " + ex.Message);
             }
         }
 
@@ -282,17 +282,17 @@ namespace BetterFG.Features.MorePlatformIcon
             }
             catch (Exception ex)
             {
-                Debug.LogWarning("[PrivateLobbyName] customname " + ex.Message);
+                Plugin.Log.LogWarning("PrivateLobbyName: customname " + ex.Message);
             }
         }
 
-        // build a remoteNametagInfo from your own live nametag settings so the local row gets the
+        // build a RemoteNametagInfo from your own live nametag settings so the local row gets the
         // same name+colour+style path as everyone else.
-        private static BetterFG.Network.remoteNametagInfo LocalNametagInfo()
+        private static BetterFG.Network.RemoteNametagInfo LocalNametagInfo()
         {
             var ci = System.Globalization.CultureInfo.InvariantCulture;
             float F(string k, float d) => float.TryParse(BetterFG.Services.SettingsService.Get(k, ""), System.Globalization.NumberStyles.Float, ci, out float v) ? v : d;
-            return new BetterFG.Network.remoteNametagInfo
+            return new BetterFG.Network.RemoteNametagInfo
             {
                 customName = LocalPlayerInfo.CustomName,
                 r = F("nametag.color.r", 1f), g = F("nametag.color.g", 1f), b = F("nametag.color.b", 1f),
@@ -329,7 +329,7 @@ namespace BetterFG.Features.MorePlatformIcon
             }
             catch (Exception ex)
             {
-                Debug.LogWarning("[PrivateLobbyName] platform " + ex.Message);
+                Plugin.Log.LogWarning("PrivateLobbyName: platform " + ex.Message);
             }
         }
 
@@ -379,7 +379,7 @@ namespace BetterFG.Features.MorePlatformIcon
             }
             catch (Exception ex)
             {
-                Debug.LogWarning("[PrivateLobbyName] row " + ex.Message);
+                Plugin.Log.LogWarning("PrivateLobbyName: row " + ex.Message);
             }
         }
     }

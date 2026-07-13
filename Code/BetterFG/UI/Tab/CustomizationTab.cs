@@ -116,7 +116,7 @@ namespace BetterFG.UI.Tab
                 tex.wrapMode = TextureWrapMode.Clamp;
                 cache = tex;
             }
-            catch (Exception ex) { Debug.LogError("[BetterFG] Tex load failed: " + ex.Message); }
+            catch (Exception ex) { Plugin.Log.LogError("BetterFG: Tex load failed: " + ex.Message); }
             return cache;
         }
 
@@ -402,7 +402,7 @@ namespace BetterFG.UI.Tab
         {
             if (_fakeInputLocked == active) return;
             _fakeInputLocked = active;
-            BetterFG.Services.fginputlockservice.SetFakeFieldLock(active);
+            BetterFG.Services.FGInputLockService.SetFakeFieldLock(active);
         }
 
         // ── Build ─────────────────────────────────────────────────────────────
@@ -1783,7 +1783,7 @@ namespace BetterFG.UI.Tab
             skinCovers[key] = tex;
             if (_coverImages.TryGetValue(key, out Image img) && img != null)
                 try { ApplyCover(img, tex); }
-                catch (Exception ex) { Debug.LogWarning($"[SkinUI] Cover sprite failed: {ex.Message}"); }
+                catch (Exception ex) { Plugin.Log.LogWarning($"SkinUI: Cover sprite failed: {ex.Message}"); }
         }
 
         private static void ApplyCover(Image img, Texture2D tex)
@@ -2037,7 +2037,7 @@ namespace BetterFG.UI.Tab
             string url = $"{repoRaw}/{folder}/{next.file}";
             string infoUrl = $"{repoRaw}/{folder}/info.json";
 
-            Debug.Log($"[BetterFG] Downloading: {url}");
+            Plugin.Log.LogInfo($"BetterFG: Downloading: {url}");
 
             // stamp sourceRepo so downstream (SkinApplicationService) can resolve correctly
             next.sourceRepo = repoRaw;
@@ -2119,7 +2119,7 @@ namespace BetterFG.UI.Tab
 
             AssetBundle bundle = null;
             try { bundle = AssetBundle.LoadFromMemory(bytes); }
-            catch (Exception ex) { Debug.LogWarning($"[Plinth] bundle load failed: {ex.Message}"); }
+            catch (Exception ex) { Plugin.Log.LogWarning($"Plinth: bundle load failed: {ex.Message}"); }
 
             if (bundle == null) { SetStatus("Plinth: bundle load failed"); yield break; }
 

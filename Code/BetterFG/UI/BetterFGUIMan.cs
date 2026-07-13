@@ -226,9 +226,9 @@ namespace BetterFG.UI
         void OnDisable() { ClearHover(); }
     }
 
-    internal class tooltipTrigger : MonoBehaviour
+    internal class TooltipTrigger : MonoBehaviour
     {
-        public tooltipTrigger(IntPtr ptr) : base(ptr) { }
+        public TooltipTrigger(IntPtr ptr) : base(ptr) { }
         public string text = "";
         // no hover delay — pops the instant the pointer is over the trigger (used by the little
         // "?" credit markers next to tweak labels).
@@ -351,8 +351,12 @@ namespace BetterFG.UI
             "BetterFG.assets.ui.general.pattern_crown_blue.png",
             "BetterFG.assets.ui.general.pattern_crown_yellow.png",
             "BetterFG.assets.ui.general.pattern_ss3.png",
+            "BetterFG.assets.ui.general.pattern_ss1.png",
+            "BetterFG.assets.ui.general.pattern_ss2.png",
+            "BetterFG.assets.ui.general.pattern_ss4.png",
         };
-        public static readonly string[] BackdropNames = { "Grey Crowns", "Blue Crowns", "Yellow Crowns", "Underwater" };
+        public static readonly string[] BackdropNames =
+            { "Grey Crowns", "Blue Crowns", "Yellow Crowns", "Underwater", "Stadium", "Space", "Digital" };
 
         public const string KEY_BACKDROP_OPACITY = "ui.backdrop.opacity";
 
@@ -419,7 +423,7 @@ namespace BetterFG.UI
             WinDialogs.Tick();
             FileDropService.Init(); // one-shot; self-guards once the game window exists
             UpdateInputNavState();
-            fginputlockservice.Tick();
+            FGInputLockService.Tick();
             MenuMusicService.TickVolume();
             SettingsService.TickBackup();
 
@@ -498,7 +502,7 @@ namespace BetterFG.UI
             // under the cursor deselects it out from under the batch op.
             bool inLE = Features.UnityRound.Editor.UnityRoundLoader.InLevelEditor;
             bool inputRestricted = inLE && (_visible || UI.Windows.Creative.BatchEditWindow.AnyOpen);
-            fginputlockservice.SetEditorUiLock(inputRestricted);
+            FGInputLockService.SetEditorUiLock(inputRestricted);
 
             // show the hint whenever the UI is open (not just in creative), since game input is
             // always locked while BettrFG is up. font isn't loaded at startup so grab it lazily.
@@ -535,7 +539,7 @@ namespace BetterFG.UI
             // write the real-field latch only; the fake-field caret paths own the
             // other latch, and the service locks if either is set, so we don't
             // stomp a fake field that's currently being typed in
-            fginputlockservice.SetRealFieldLock(blockNav);
+            FGInputLockService.SetRealFieldLock(blockNav);
         }
 
         // ── Init ──────────────────────────────────────────────────────────────
@@ -1038,7 +1042,7 @@ namespace BetterFG.UI
         // ── Tooltip ───────────────────────────────────────────────────────────
         public static void MakeObjectTooltip(RectTransform rt, string text)
         {
-            var t = rt.gameObject.AddComponent<tooltipTrigger>();
+            var t = rt.gameObject.AddComponent<TooltipTrigger>();
             t.text = text;
         }
 
@@ -1135,7 +1139,7 @@ namespace BetterFG.UI
             cg.blocksRaycasts = false;
 
             // bob up and down via the reusable pulse component
-            var pulse = go.AddComponent<BetterFG.UI.Components.move_pulseContinuousMove>();
+            var pulse = go.AddComponent<BetterFG.UI.Components.MovePulseContinuous>();
             pulse.axis = Vector3.up;
             pulse.speed = 1.6f;
             pulse.strength = 8f * UIScale.S;
@@ -1168,7 +1172,7 @@ namespace BetterFG.UI
                 tex.wrapMode = TextureWrapMode.Clamp;
                 _arrowTex = tex;
             }
-            catch (Exception ex) { Debug.LogError("[BetterFG] arrow tex load: " + ex.Message); }
+            catch (Exception ex) { Plugin.Log.LogError("BetterFG: arrow tex load: " + ex.Message); }
             return _arrowTex;
         }
 
@@ -1271,7 +1275,7 @@ namespace BetterFG.UI
                 pimg.material = mat;
             }
 
-            var scroll = go.AddComponent<BetterFG.UI.Components.move_scrollUvRaw>();
+            var scroll = go.AddComponent<BetterFG.UI.Components.MoveScrollUvRaw>();
             scroll.speed = new Vector2(0.04f, 0.02f);
         }
 
@@ -1425,7 +1429,7 @@ namespace BetterFG.UI
             _creativeHintText.raycastTarget = false;
             // font + outline get set lazily in EnsureHintStyle (Asap isn't loaded this early)
 
-            _creativeHintGo.AddComponent<BetterFG.UI.Components.alpha_pulseContinuousFade>();
+            _creativeHintGo.AddComponent<BetterFG.UI.Components.AlphaPulseContinuousFade>();
 
             UpdateCreativeHintText();
             KeybindService.OnRebound += _ => UpdateCreativeHintText();
@@ -1482,7 +1486,7 @@ namespace BetterFG.UI
                     if (fa.name.IndexOf("asap", StringComparison.OrdinalIgnoreCase) >= 0) { _asapFont = fa; break; }
                 }
             }
-            catch (Exception ex) { Debug.LogWarning("[BetterFG] asap font: " + ex.Message); }
+            catch (Exception ex) { Plugin.Log.LogWarning("BetterFG: asap font: " + ex.Message); }
             return _asapFont;
         }
 

@@ -17,7 +17,7 @@ using BetterFG.UI.Tab;
 
 namespace BetterFG.Network
 {
-    public class remoteNametagInfo
+    public class RemoteNametagInfo
     {
         public float r, g, b;
         public bool bold, italic;
@@ -37,7 +37,7 @@ namespace BetterFG.Network
         public string nickname;
     }
 
-    public class remoteSkinEntry
+    public class RemoteSkinEntry
     {
         public string file;
         public string type;
@@ -46,13 +46,13 @@ namespace BetterFG.Network
         public string repoUrl; // raw base URL, e.g. https://raw.githubusercontent.com/oreytv/BetterFGPublicSkins/main
     }
 
-    public class playerRemoteProfile
+    public class PlayerRemoteProfile
     {
         public uint playerID;
         public string episodeGUID;
         public float playerScale;
-        public List<remoteSkinEntry> skins = new List<remoteSkinEntry>();
-        public remoteNametagInfo nametag;
+        public List<RemoteSkinEntry> skins = new List<RemoteSkinEntry>();
+        public RemoteNametagInfo nametag;
         public string playerKey;
         public string resolvedPlayerKey;
         // .bfgprofile profiles only apply to the bean whose clean name matches playerKey —
@@ -66,15 +66,7 @@ namespace BetterFG.Network
 
         public static NetworkClient Instance { get; private set; }
 
-        private static string GetSkinRepoRaw(remoteSkinEntry entry)
-        {
-            if (!string.IsNullOrEmpty(entry?.repoUrl))
-                return entry.repoUrl.TrimEnd('/');
-            return RepoRegistry.Instance?.Active?.RawBase
-                   ?? "https://raw.githubusercontent.com/oreytv/BetterFGPublicSkins/main";
-        }
-
-        private List<playerRemoteProfile> _profiles = new List<playerRemoteProfile>();
+        private List<PlayerRemoteProfile> _profiles = new List<PlayerRemoteProfile>();
 
         void Awake() => Instance = this;
 
@@ -98,45 +90,20 @@ namespace BetterFG.Network
 #endif
         }
 
-        public void RegisterLocalProfileFromApplication()
+        // keyed only, never positional: without a key this lands in _pending and ResolvePending
+        // stamps our loadout onto some remote bean
+        public void RegisterLocalProfile()
         {
-            var app = GetApplicationService();
-            if (app == null) return;
+            string key;
+            try { key = GlobalGameStateClient.Instance?.GetLocalPlayerKey() ?? ""; }
+            catch { key = ""; }
+            if (string.IsNullOrEmpty(key)) return;
 
-            var profile = new playerRemoteProfile();
+            var profile = RemoteProfileStore.LocalLoadout() ?? new PlayerRemoteProfile();
+            profile.playerKey = key;
             profile.playerScale = PlayerScaleService.GetPlayerScale();
-            profile.skins = new List<remoteSkinEntry>();
 
-            var slots = app.GetActiveSlots();
-            if (slots != null)
-            {
-                foreach (var s in slots)
-                {
-                    if (s == null || s.skinInfo == null) continue;
-
-                    var se = new remoteSkinEntry
-                    {
-                        file = s.skinInfo.file,
-                        type = s.skinInfo.type,
-                        source = "local",
-                        localPath = s.skinInfo.localPath,
-                        repoUrl = s.skinInfo.sourceRepo,
-                    };
-
-                    profile.skins.Add(se);
-                }
-            }
-
-            try
-            {
-                profile.playerKey = GlobalGameStateClient.Instance?.GetLocalPlayerKey() ?? "";
-            }
-            catch
-            {
-                profile.playerKey = "";
-            }
-
-            RemoteProfileStore.Register(profile, profile.playerKey);
+            RemoteProfileStore.Register(profile, key);
         }
 
         private void LoadProfilesFromFile()
@@ -148,7 +115,7 @@ namespace BetterFG.Network
             {
                 string json = null;
                 try { json = File.ReadAllText(path); }
-                catch (Exception ex) { Debug.LogError("[NetworkClient] read err: " + ex.Message); }
+                catch (Exception ex) { Plugin.Log.LogError("NetworkClient: read err: " + ex.Message); }
 
                 if (json != null)
                     foreach (string entry in JsonUtil.GetRootArray(json))
@@ -157,7 +124,7 @@ namespace BetterFG.Network
                         if (p != null) _profiles.Add(p);
                     }
             }
-            else Debug.Log("[NetworkClient] no debug_profiles.json");
+            else Plugin.Log.LogInfo("NetworkClient: no debug_profiles.json");
 
 #if PROFILES
             // saved player profiles (.bfgprofile) ride the same pipeline
@@ -184,89 +151,12 @@ namespace BetterFG.Network
 
             RemoteProfileStore.ResolvePending(localBean);
 
-            // First pass: pre-download and cache all unique skins
-            var uniqueSkins = new Dictionary<string, remoteSkinEntry>();
-            foreach (var profile in _profiles)
-            {
-                if (profile.skins != null && profile.skins.Count > 0)
-                {
-                    foreach (var skin in profile.skins)
-                    {
-                        if (!uniqueSkins.ContainsKey(skin.file))
-                            uniqueSkins[skin.file] = skin;
-                    }
-                }
-            }
+            var appSvc = CustomizationServices.ApplicationService;
+            var loader = CustomizationServices.LoaderService;
+            if (appSvc == null || loader == null) yield break;
 
-            var appSvc = GetApplicationService();
-            if (appSvc == null) yield break;
-
-            // Pre-load all unique skins
-            foreach (var kvp in uniqueSkins)
-            {
-                var skinEntry = kvp.Value;
-                if (appSvc.TryGetLoadedBundle(skinEntry.file, out var existing) && existing != null)
-                    continue;
-
-                byte[] bytes = null;
-                if (skinEntry.source == "local" && !string.IsNullOrEmpty(skinEntry.localPath))
-                {
-                    try { bytes = File.ReadAllBytes(skinEntry.localPath); }
-                    catch (Exception ex)
-                    {
-                        Debug.LogError($"[NetworkClient] local read failed: {ex.Message}");
-                        continue;
-                    }
-                }
-                else
-                {
-                    SkinType type = SkinTypeParser.FromString(skinEntry.type);
-                    if (type == SkinType.Unknown) continue;
-
-                    string category = GetCategoryFolder(type);
-                    string repoRaw = GetSkinRepoRaw(skinEntry);
-                    string url = $"{repoRaw}/{category}/{skinEntry.file}/{skinEntry.file}";
-
-                    bool sizeOk = false;
-                    string sizeErr = null;
-                    yield return RepoRegistry.CheckBundleSize(url, (ok, err) => { sizeOk = ok; sizeErr = err; }).WrapToIl2Cpp();
-                    if (!sizeOk)
-                    {
-                        Debug.LogWarning($"[NetworkClient] {sizeErr}");
-                        continue;
-                    }
-
-                    UnityWebRequest www = UnityWebRequest.Get(url);
-                    yield return www.SendWebRequest();
-
-                    if (www.result == UnityWebRequest.Result.Success)
-                        bytes = www.downloadHandler.data;
-                    else
-                    {
-                        Debug.LogError($"[NetworkClient] dl failed {url} — {www.error}");
-                        www.Dispose();
-                        continue;
-                    }
-
-                    www.Dispose();
-                }
-
-                if (bytes != null)
-                {
-                    if (!appSvc.TryGetLoadedBundle(skinEntry.file, out var bundle))
-                    {
-                        var loadReq = AssetBundle.LoadFromMemoryAsync(bytes);
-                        yield return loadReq;
-                        bundle = loadReq.assetBundle;
-                    }
-                    if (bundle != null)
-                        appSvc.RegisterRemoteBundle(skinEntry.file, bundle);
-                }
-            }
-
-            // Second pass: apply all cached skins to beans. key-match profiles (.bfgprofile) bind
-            // to the bean whose clean name matches playerKey (local bean included); debug entries
-            // keep the old positional behaviour.
+            // key-match profiles (.bfgprofile) bind to the bean whose clean name matches playerKey
+            // (local bean included); debug entries keep the old positional behaviour.
             for (int i = 0; i < _profiles.Count; i++)
             {
                 var profile = _profiles[i];
@@ -289,9 +179,9 @@ namespace BetterFG.Network
                             { bean = r; break; }
                         }
 
-                    if (bean == null) { Debug.Log($"[NetworkClient] no bean named '{want}' for profile"); continue; }
+                    if (bean == null) { Plugin.Log.LogInfo($"NetworkClient: no bean named '{want}' for profile"); continue; }
                     profile.resolvedPlayerKey = profile.playerKey;
-                    Debug.Log($"[NetworkClient] profile '{want}' -> {bean.name}");
+                    Plugin.Log.LogInfo($"NetworkClient: profile '{want}' -> {bean.name}");
                 }
                 else
                 {
@@ -302,8 +192,13 @@ namespace BetterFG.Network
                 if (profile.playerScale > 0f)
                     PlayerScaleService.ApplySkinScaleToBean(bean, profile.playerScale, PlayerScaleService.BeanScaleMode.Remote);
 
-                if (profile.skins != null && profile.skins.Count > 0)
-                    yield return ApplySkinsToBeanCached(profile, bean, appSvc).WrapToIl2Cpp();
+                foreach (var entry in profile.skins)
+                {
+                    ActiveSkinSlot slot = null;
+                    yield return loader.ResolveProfileSlot(entry, s => slot = s).WrapToIl2Cpp();
+                    if (slot != null)
+                        yield return appSvc.ApplySkinToBean(slot, bean).WrapToIl2Cpp();
+                }
 
 #if PROFILES
                 if (profile.requireKeyMatch)
@@ -313,7 +208,7 @@ namespace BetterFG.Network
             }
         }
 
-        internal static IEnumerator PollAndApplyNametagForBean(GameObject bean, remoteNametagInfo info)
+        internal static IEnumerator PollAndApplyNametagForBean(GameObject bean, RemoteNametagInfo info)
         {
             float elapsed = 0f;
             while (elapsed < 8f)
@@ -324,7 +219,7 @@ namespace BetterFG.Network
                     var tmp = NametagIconApplicator.TryGetNameText(display);
                     if (tmp != null)
                     {
-                        Debug.Log($"[NetworkClient] nametag apply {bean.name} elapsed={elapsed:F2}s");
+                        Plugin.Log.LogInfo($"NetworkClient: nametag apply {bean.name} elapsed={elapsed:F2}s");
                         NametagIconApplicator.ApplyRemoteToDisplay(display, tmp.text, info);
 
                         // nameplate backing + nickname subtext from the profile (search from the
@@ -343,10 +238,10 @@ namespace BetterFG.Network
                 yield return new WaitForSeconds(0.25f);
                 elapsed += 0.25f;
             }
-            Debug.LogWarning($"[NetworkClient] nametag poll timed out for {bean.name}");
+            Plugin.Log.LogWarning($"NetworkClient: nametag poll timed out for {bean.name}");
         }
 
-        private static IEnumerator PollAndApplyPlatformIconForBean(GameObject bean, remoteNametagInfo info)
+        private static IEnumerator PollAndApplyPlatformIconForBean(GameObject bean, RemoteNametagInfo info)
         {
             var fgcc = bean.GetComponent<FallGuysCharacterController>();
             if (fgcc == null) yield break;
@@ -379,75 +274,14 @@ namespace BetterFG.Network
                 yield return new WaitForSeconds(0.1f);
                 elapsed += 0.1f;
             }
-            Debug.LogWarning($"[NetworkClient] timed out for '{bean.name}'");
+            Plugin.Log.LogWarning($"NetworkClient: timed out for '{bean.name}'");
         }
 
-        private IEnumerator ApplySkinsToBeanCached(playerRemoteProfile profile, GameObject bean, SkinApplicationService appSvc)
-        {
-            foreach (var skinEntry in profile.skins)
-            {
-                SkinType type = SkinTypeParser.FromString(skinEntry.type);
-                if (type == SkinType.Unknown) continue;
-
-                // Bundle should already be loaded from pre-download phase
-                if (!appSvc.TryGetLoadedBundle(skinEntry.file, out var bundle) || bundle == null)
-                    continue;
-
-                float skinScale = 0f;
-                bool keepBase = false;
-                string infoJson = null;
-                string repoRaw = GetSkinRepoRaw(skinEntry);
-                string category = GetCategoryFolder(type);
-                string infoUrl = $"{repoRaw}/{category}/{skinEntry.file}/info.json";
-
-                UnityWebRequest infoWww = UnityWebRequest.Get(infoUrl);
-                yield return infoWww.SendWebRequest();
-
-                if (infoWww.result == UnityWebRequest.Result.Success)
-                {
-                    infoJson = infoWww.downloadHandler.text;
-                    skinScale = JsonUtil.GetFloat(infoJson, "skinScale", 0f);
-                    // without this the remote path treated every UGC costume as full-body and hid the
-                    // bean under it — an overlay/suit skin (keepBase=true) has nothing to replace, so it
-                    // just erased the wearer. local path already read this; remote silently dropped it.
-                    keepBase = JsonUtil.GetBool(infoJson, "keepBase");
-                }
-
-                infoWww.Dispose();
-
-                var skinInfo = new SkinInfo
-                {
-                    name = skinEntry.file,
-                    file = skinEntry.file,
-                    type = skinEntry.type,
-                    skinScale = skinScale,
-                    keepBase = keepBase,
-                    sourceRepo = repoRaw,
-                };
-
-                // items need hand placement (scale + left/right pos/rot) from info.json, else they
-                // spawn at the bean origin instead of on the hand
-                if (type == SkinType.Item && infoJson != null)
-                    SkinCatalogService.FillItemInfoFromJson(skinInfo, infoJson);
-
-                var slot = new ActiveSkinSlot
-                {
-                    skinInfo = skinInfo,
-                    bundle = bundle,
-                    type = type
-                };
-
-                yield return appSvc.ApplySkinToBean(slot, bean).WrapToIl2Cpp();
-            }
-        }
-
-        private SkinApplicationService GetApplicationService() => CustomizationServices.ApplicationService;
-
-        private static playerRemoteProfile ParseProfile(string json)
+        private static PlayerRemoteProfile ParseProfile(string json)
         {
             try
             {
-                var p = new playerRemoteProfile
+                var p = new PlayerRemoteProfile
                 {
                     playerID = (uint)JsonUtil.GetInt(json, "playerID"),
                     episodeGUID = JsonUtil.GetValue(json, "episodeGUID"),
@@ -458,7 +292,7 @@ namespace BetterFG.Network
                 var skinsArr = JsonUtil.GetArray(json, "skins");
                 foreach (string s in skinsArr)
                 {
-                    p.skins.Add(new remoteSkinEntry
+                    p.skins.Add(new RemoteSkinEntry
                     {
                         file = JsonUtil.GetValue(s, "file"),
                         type = JsonUtil.GetValue(s, "type"),
@@ -470,7 +304,7 @@ namespace BetterFG.Network
 
                 string ntJson = JsonUtil.GetObject(json, "nametag");
                 if (ntJson != null)
-                    p.nametag = new remoteNametagInfo
+                    p.nametag = new RemoteNametagInfo
                     {
                         r = JsonUtil.GetFloat(ntJson, "r", 1f),
                         g = JsonUtil.GetFloat(ntJson, "g", 1f),
@@ -502,16 +336,6 @@ namespace BetterFG.Network
             }
         }
 
-        private static string GetCategoryFolder(SkinType type)
-        {
-            switch (type)
-            {
-                case SkinType.Costume: return "Costumes";
-                case SkinType.Accessory: return "Accessories";
-                case SkinType.Item: return "Items";
-                default: return "Costumes";
-            }
-        }
     }
 
     public class AppliedRemoteSkin

@@ -113,7 +113,7 @@ namespace BetterFG.Nametag
             var any = tag.GetComponentInChildren<TMP_Text>(true);
             if (any != null) return any;
 
-            Debug.LogWarning($"[NametagFinder] NameText not found under '{tag.name}'");
+            Plugin.Log.LogWarning($"NametagFinder: NameText not found under '{tag.name}'");
             return null;
         }
 

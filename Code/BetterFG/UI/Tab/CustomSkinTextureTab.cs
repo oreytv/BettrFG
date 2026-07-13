@@ -76,7 +76,7 @@ namespace BetterFG.UI.Tab
                 tex.wrapMode = TextureWrapMode.Clamp;
                 cache = tex;
             }
-            catch (Exception ex) { Debug.LogError("[CustomSkinTex] tex load fail: " + ex.Message); }
+            catch (Exception ex) { Plugin.Log.LogError("CustomSkinTex: tex load fail: " + ex.Message); }
             return cache;
         }
 
@@ -641,10 +641,15 @@ namespace BetterFG.UI.Tab
             catch (Exception e) { SetStatus("instantiate fail: " + e.Message); yield break; }
 
             float elapsed = 0f;
+            while (!done && elapsed < 8f)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                yield return null;
+            }
 
             if (!done || instance == null)
             {
-                SetStatus(err != null ? "err: " + err.Message : "timed out");
+                SetStatus(err != null ? "err: " + err.Message : $"timed out after {elapsed:0.0}s");
                 yield break;
             }
 
@@ -750,7 +755,7 @@ namespace BetterFG.UI.Tab
             {
                 if (!entry.enabled || string.IsNullOrEmpty(entry.texPath)) continue;
                 try { LoadTexCached(entry.texPath); }
-                catch (Exception e) { Debug.LogWarning($"[SkinTex] prewarm failed for {entry.texPath}: {e.Message}"); }
+                catch (Exception e) { Plugin.Log.LogWarning($"SkinTex: prewarm failed for {entry.texPath}: {e.Message}"); }
             }
         }
 

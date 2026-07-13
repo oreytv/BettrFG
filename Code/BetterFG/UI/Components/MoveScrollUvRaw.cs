@@ -6,9 +6,9 @@ namespace BetterFG.UI.Components
 {
     // scrolls a RawImage's uvRect offset forever, so a Repeat-wrapped texture tiles and drifts.
     // keeps the uvRect size (tile count) alone — only the position moves. speed is uv units/sec.
-    public class move_scrollUvRaw : MonoBehaviour
+    public class MoveScrollUvRaw : MonoBehaviour
     {
-        public move_scrollUvRaw(IntPtr ptr) : base(ptr) { }
+        public MoveScrollUvRaw(IntPtr ptr) : base(ptr) { }
 
         public Vector2 speed = new Vector2(0.04f, 0.02f);
         public bool useUnscaledTime = true; // menus run while paused

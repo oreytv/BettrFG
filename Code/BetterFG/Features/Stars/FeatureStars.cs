@@ -18,14 +18,14 @@ namespace BetterFG.Features.Stars
 {
     public class FeatureStars
     {
-        public static readonly bfgfeature feature = new bfgfeature("stars", "Stars", true, new List<featuresetting>
+        public static readonly BfgFeature feature = new BfgFeature("stars", "Stars", true, new List<FeatureSetting>
         {
-            new featuresetting { id = "store", label = "Store stars", defaultOn = true },
-            new featuresetting { id = "qual", label = "Show star count on qual", defaultOn = true },
-            new featuresetting { id = "menu", label = "Show star count in menu", defaultOn = true },
+            new FeatureSetting { id = "store", label = "Store stars", defaultOn = true },
+            new FeatureSetting { id = "qual", label = "Show star count on qual", defaultOn = true },
+            new FeatureSetting { id = "menu", label = "Show star count in menu", defaultOn = true },
         });
 
-        static bool On(string setting) => BetterFG.Features.featureRegistry.IsOn("stars", setting);
+        static bool On(string setting) => BetterFG.Features.FeatureRegistry.IsOn("stars", setting);
 
         static TextMeshProUGUI _counterText;
         static GameObject _cachedCrownCounter;

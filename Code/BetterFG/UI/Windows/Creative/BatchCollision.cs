@@ -1,4 +1,4 @@
-using LevelEditor;
+﻿using LevelEditor;
 
 namespace BetterFG.UI.Windows.Creative
 {
@@ -11,7 +11,7 @@ namespace BetterFG.UI.Windows.Creative
         public static int SetCollisionEnabled(bool enabled)
         {
             var sel = LevelEditorMultiSelectionHandler.Selection();
-            if (sel == null) { Plugin.Log.LogWarning("[BatchCollision] no selection"); return 0; }
+            if (sel == null) { Plugin.Log.LogWarning("BatchCollision: no selection"); return 0; }
 
             var entry = BatchEditHistory.Begin(enabled ? "collision on" : "collision off");
             int touched = 0, noParam = 0;
@@ -28,7 +28,7 @@ namespace BetterFG.UI.Windows.Creative
                 touched++;
             }
             BatchEditHistory.Push(entry);
-            Plugin.Log.LogInfo($"[BatchCollision] {(enabled ? "on" : "off")} -> {touched} set, {noParam} no-collision-param");
+            Plugin.Log.LogInfo($"BatchCollision: {(enabled ? "on" : "off")} -> {touched} set, {noParam} no-collision-param");
             return touched;
         }
     }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Reflection;
 using BetterFG.Services;
 using FallGuysLib.Players;
@@ -148,7 +148,7 @@ namespace BetterFG.UI
             t.alignment = TextAnchor.MiddleCenter;
             t.raycastTarget = false;
 
-            var trig = go.AddComponent<tooltipTrigger>();
+            var trig = go.AddComponent<TooltipTrigger>();
             trig.text = tip;
             trig.instant = true;
             return go;
@@ -219,7 +219,7 @@ namespace BetterFG.UI
                 tex.wrapMode = TextureWrapMode.Clamp;
                 _btnSprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
             }
-            catch (Exception ex) { Debug.LogError("[UGUIShip] button.png load failed: " + ex.Message); }
+            catch (Exception ex) { Plugin.Log.LogError("UGUIShip: button.png load failed: " + ex.Message); }
             return _btnSprite;
         }
 
@@ -246,7 +246,7 @@ namespace BetterFG.UI
                     new Vector4(16, 16, 16, 16)
                 );
             }
-            catch (Exception ex) { Debug.LogError("[UGUIShip] button_shine.png load failed: " + ex.Message); }
+            catch (Exception ex) { Plugin.Log.LogError("UGUIShip: button_shine.png load failed: " + ex.Message); }
             return _btnShineSprite;
         }
 
@@ -265,7 +265,7 @@ namespace BetterFG.UI
                 tex.wrapMode = TextureWrapMode.Clamp;
                 _radialGradCornerSprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0f, 1f));
             }
-            catch (Exception ex) { Debug.LogError("[UGUIShip] radialgradcorner128.png load failed: " + ex.Message); }
+            catch (Exception ex) { Plugin.Log.LogError("UGUIShip: radialgradcorner128.png load failed: " + ex.Message); }
             return _radialGradCornerSprite;
         }
 

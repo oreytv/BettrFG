@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using BepInEx.Unity.IL2CPP.Utils.Collections;
 using FGClient;
@@ -16,7 +16,7 @@ namespace BetterFG.Tweaks
     // to make room for the bar at the top.
     //
     // no real InputField here � we drive a fake caret off Input.inputString and lean on
-    // fginputlockservice so wasd/etc don't leak into the game while typing, same as the tabs.
+    // FGInputLockService so wasd/etc don't leak into the game while typing, same as the tabs.
     public class LobbyShowSearchTweak : BfgTweak
     {
         public LobbyShowSearchTweak(IntPtr ptr) : base(ptr) { }
@@ -81,7 +81,7 @@ namespace BetterFG.Tweaks
                     }
                     catch (Exception ex)
                     {
-                        Plugin.Log?.LogWarning("[LobbyShowSearch] build failed " + ex.Message);
+                        Plugin.Log?.LogWarning("LobbyShowSearch: build failed " + ex.Message);
                     }
                     yield break;
                 }
@@ -89,7 +89,7 @@ namespace BetterFG.Tweaks
                 yield return new WaitForSeconds(0.1f);
                 elapsed += 0.1f;
             }
-            Plugin.Log?.LogWarning("[LobbyShowSearch] timed out finding show select screen");
+            Plugin.Log?.LogWarning("LobbyShowSearch: timed out finding show select screen");
         }
 
         private static void ApplyViewportLayout(Transform viewport)
@@ -218,7 +218,7 @@ namespace BetterFG.Tweaks
         {
             if (_focused == focused) return;
             _focused = focused;
-            BetterFG.Services.fginputlockservice.SetFakeFieldLock(focused);
+            BetterFG.Services.FGInputLockService.SetFakeFieldLock(focused);
             UpdateCaret();
         }
 

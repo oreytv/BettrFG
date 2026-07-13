@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -38,7 +38,7 @@ namespace BetterFG.Services
 
             if (req.result != UnityWebRequest.Result.Success)
             {
-                Debug.LogWarning($"[MenuMusicCatalog] fetch failed: {req.error}");
+                Plugin.Log.LogWarning($"MenuMusicCatalog: fetch failed: {req.error}");
                 req.Dispose();
                 onDone?.Invoke();
                 yield break;
@@ -67,7 +67,7 @@ namespace BetterFG.Services
 
             if (req.result != UnityWebRequest.Result.Success)
             {
-                Debug.LogWarning($"[MenuMusicCatalog] download {t.name} failed: {req.error}");
+                Plugin.Log.LogWarning($"MenuMusicCatalog: download {t.name} failed: {req.error}");
                 req.Dispose();
                 onDone?.Invoke(false);
                 yield break;
@@ -76,7 +76,7 @@ namespace BetterFG.Services
             try { File.WriteAllBytes(dest, req.downloadHandler.data); }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[MenuMusicCatalog] write {t.name} failed: {ex.Message}");
+                Plugin.Log.LogWarning($"MenuMusicCatalog: write {t.name} failed: {ex.Message}");
                 req.Dispose();
                 onDone?.Invoke(false);
                 yield break;

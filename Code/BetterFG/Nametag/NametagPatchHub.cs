@@ -170,7 +170,7 @@ namespace BetterFG.Nametag
                     RefreshRemoteNametags();
                     BeanMonitorService.Instance?.StartCoroutine(RefreshSpawnedNametagsDeferred().WrapToIl2Cpp());
                 }
-                catch (System.Exception ex) { Debug.LogWarning("[BFGFont] SpawnPlayerTag: " + ex.Message); }
+                catch (System.Exception ex) { Plugin.Log.LogWarning("BFGFont: SpawnPlayerTag: " + ex.Message); }
             }
         }
 
@@ -198,7 +198,7 @@ namespace BetterFG.Nametag
                     var tmp = NametagIconApplicator.TryGetNameText(__instance);
                     if (tmp != null) FontReplacementService.ApplyToNametag(tmp);
                 }
-                catch (System.Exception ex) { Debug.LogWarning("[BFGFont] SetNameVisualsFame: " + ex.Message); }
+                catch (System.Exception ex) { Plugin.Log.LogWarning("BFGFont: SetNameVisualsFame: " + ex.Message); }
             }
         }
 
@@ -284,7 +284,7 @@ namespace BetterFG.Nametag
             }
             catch (System.Exception ex)
             {
-                Debug.LogWarning("[NametagPatchHub] refresh " + ex.Message);
+                Plugin.Log.LogWarning("NametagPatchHub: refresh " + ex.Message);
             }
         }
 
@@ -357,7 +357,7 @@ namespace BetterFG.Nametag
             BeanMonitorService.Instance?.StartCoroutine(PollAndApplyPlatformIcon(vm, info).WrapToIl2Cpp());
         }
 
-        private static IEnumerator PollAndApplyPlatformIcon(NameTagViewModel vm, remoteNametagInfo info)
+        private static IEnumerator PollAndApplyPlatformIcon(NameTagViewModel vm, RemoteNametagInfo info)
         {
             float elapsed = 0f;
             while (elapsed < 5f)
@@ -368,10 +368,10 @@ namespace BetterFG.Nametag
                 yield return new WaitForSeconds(0.1f);
                 elapsed += 0.1f;
             }
-            Debug.LogWarning($"[NametagPatchHub] timed out waiting for HUD row for '{vm._playerName}'");
+            Plugin.Log.LogWarning($"NametagPatchHub: timed out waiting for HUD row for '{vm._playerName}'");
         }
 
-        private static bool TryApplyPlatformIcon(NameTagViewModel vm, remoteNametagInfo info)
+        private static bool TryApplyPlatformIcon(NameTagViewModel vm, RemoteNametagInfo info)
         {
             bool hide = info.platformHide == "true";
             string customSprite = info.platformCustom ?? "";

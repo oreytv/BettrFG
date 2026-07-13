@@ -155,7 +155,7 @@ namespace BetterFG.Core
                     {
                         clip.hideFlags = HideFlags.HideAndDontSave;
                         animClips[key] = clip;
-                        Debug.Log($"[AssetManager] loaded clip '{key}' from {res}");
+                        Plugin.Log.LogInfo($"AssetManager: loaded clip '{key}' from {res}");
                         continue;
                     }
 
@@ -165,7 +165,7 @@ namespace BetterFG.Core
                         shader.hideFlags = HideFlags.HideAndDontSave;
                         DontDestroyOnLoad(shader);
                         shaders[key] = shader;
-                        Debug.Log($"[AssetManager] loaded shader '{key}' ({shader.name}) from {res}");
+                        Plugin.Log.LogInfo($"AssetManager: loaded shader '{key}' ({shader.name}) from {res}");
                         continue;
                     }
 
@@ -175,7 +175,7 @@ namespace BetterFG.Core
                     go.hideFlags = HideFlags.HideAndDontSave;
                     go.transform.position = new(go.transform.position.x, go.transform.position.y - 99999, go.transform.position.z);
                     prefabs[key] = go;
-                    Debug.Log($"[AssetManager] loaded '{key}' from {res}");
+                    Plugin.Log.LogInfo($"AssetManager: loaded '{key}' from {res}");
                 }
                 bundle.Unload(false);
             }

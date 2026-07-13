@@ -6,9 +6,9 @@ namespace BetterFG.UI.Components
     // drop this on anything (UI RectTransform or world Transform) to make it bob/pulse back and
     // forth along an axis forever. flexible: set the axis, speed (cycles per second) and strength
     // (amplitude). oscillates around wherever it started, so it doesn't fight layout/anchoring.
-    public class move_pulseContinuousMove : MonoBehaviour
+    public class MovePulseContinuous : MonoBehaviour
     {
-        public move_pulseContinuousMove(IntPtr ptr) : base(ptr) { }
+        public MovePulseContinuous(IntPtr ptr) : base(ptr) { }
 
         public Vector3 axis = Vector3.up;   // direction of travel (normalized on Awake)
         public float speed = 1.5f;          // full cycles per second

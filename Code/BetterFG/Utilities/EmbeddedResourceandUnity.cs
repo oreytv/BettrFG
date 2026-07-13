@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Reflection;
 using UnityEngine;
@@ -15,7 +15,7 @@ namespace BetterFG.Utilities
             {
                 if (stream == null)
                 {
-                    Debug.LogWarning($"EmbeddedRes: no resource at '{resourcePath}'");
+                    Plugin.Log.LogWarning($"EmbeddedRes: no resource at '{resourcePath}'");
                     return null;
                 }
 

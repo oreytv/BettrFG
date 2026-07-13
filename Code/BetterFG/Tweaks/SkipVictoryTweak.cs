@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using FG.Common;
 using FGClient;
 using HarmonyLib;
@@ -41,7 +41,7 @@ namespace BetterFG.Tweaks
             }
             catch (Exception ex)
             {
-                Plugin.Log?.LogWarning("[SkipVictoryTweak] skip failed " + ex.Message);
+                Plugin.Log?.LogWarning("SkipVictoryTweak: skip failed " + ex.Message);
                 ActiveState = null;
             }
         }

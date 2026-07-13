@@ -73,7 +73,7 @@ namespace BetterFG.Services
                 var stream = asm.GetManifestResourceStream(PREFIX + filename);
                 if (stream == null)
                 {
-                    Debug.LogWarning($"[AudioService] Not found: {PREFIX + filename}");
+                    Plugin.Log.LogWarning($"AudioService: Not found: {PREFIX + filename}");
                     return;
                 }
 
@@ -97,7 +97,7 @@ namespace BetterFG.Services
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[AudioService] Play({filename}) failed: {ex.Message}");
+                Plugin.Log.LogWarning($"AudioService: Play({filename}) failed: {ex.Message}");
             }
         }
     }

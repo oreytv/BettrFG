@@ -10,7 +10,7 @@ namespace BetterFG.UI.Components
     // "look here" flash for any control in any tab/window/subtab. give it the graphics you want to draw the
     // eye to; each one glows blue, holds solid for HOLD seconds, then fades back to its own colour over FADE.
     // driven off the sidewheel's live coroutine host so nothing new needs il2cpp registration.
-    public static class alpha_highlightPulse
+    public static class AlphaHighlightPulse
     {
         private static readonly Color BLUE = new Color(0.25f, 0.55f, 1f, 1f);
         private const float HOLD = 2f;
@@ -45,7 +45,7 @@ namespace BetterFG.UI.Components
             foreach (var name in names)
             {
                 var t = FindDeep(root, name);
-                if (t == null) { Debug.LogWarning($"highlight: couldn't find '{name}' to flash under {root.name}"); continue; }
+                if (t == null) { Plugin.Log.LogWarning($"highlight: couldn't find '{name}' to flash under {root.name}"); continue; }
                 var g = t.GetComponent<Graphic>();
                 if (g != null) found.Add(g);
             }

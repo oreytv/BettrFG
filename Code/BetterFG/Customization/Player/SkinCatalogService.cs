@@ -126,7 +126,7 @@ namespace BetterFG.Customization.Player
 
             if (catReq.result != UnityWebRequest.Result.Success)
             {
-                Debug.LogError($"[SkinCatalog] catalog.json fetch failed: {catReq.error}");
+                Plugin.Log.LogError($"SkinCatalog: catalog.json fetch failed: {catReq.error}");
                 OnStatusUpdate?.Invoke($"Failed to fetch {label}");
                 catReq.Dispose();
                 _pendingFetches--;
@@ -318,7 +318,7 @@ namespace BetterFG.Customization.Player
             _catalogTotal += added;
             _catalogTotalByRepo[repoRaw] = added;
             count = added;
-            Debug.Log($"[SkinCatalog] {label}: fat catalog2.json, {added} skins in one request");
+            Plugin.Log.LogInfo($"SkinCatalog: {label}: fat catalog2.json, {added} skins in one request");
             return true;
         }
 
@@ -406,7 +406,7 @@ namespace BetterFG.Customization.Player
             }
             catch (Exception e)
             {
-                Debug.LogError($"[SkinCatalog] Parse error for {folder}: {e.Message}");
+                Plugin.Log.LogError($"SkinCatalog: Parse error for {folder}: {e.Message}");
                 return null;
             }
         }

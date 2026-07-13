@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
@@ -46,7 +46,7 @@ namespace BetterFG.Customization.Social
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[EmoteSettings] Load failed: {ex.Message}");
+                Plugin.Log.LogError($"EmoteSettings: Load failed: {ex.Message}");
             }
 
             return list;
@@ -70,7 +70,7 @@ namespace BetterFG.Customization.Social
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[EmoteSettings] Save failed: {ex.Message}");
+                Plugin.Log.LogError($"EmoteSettings: Save failed: {ex.Message}");
             }
         }
     }

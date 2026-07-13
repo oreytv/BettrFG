@@ -72,7 +72,7 @@ namespace BetterFG.Customization.Social
                 output.Play();
                 output.PlaybackStopped += (_, __) => { output.Dispose(); reader.Dispose(); ms.Dispose(); };
             }
-            catch (Exception ex) { Debug.LogWarning($"[PhraseInjection] sound play failed: {ex.Message}"); }
+            catch (Exception ex) { Plugin.Log.LogWarning($"PhraseInjection: sound play failed: {ex.Message}"); }
         }
 
         private static float GetVolume()
@@ -199,7 +199,7 @@ namespace BetterFG.Customization.Social
             catch (Exception ex)
             {
                 LastStatus = $"Error: {ex.Message}";
-                Debug.LogError($"[PhraseInjection] {ex.Message}");
+                Plugin.Log.LogError($"PhraseInjection: {ex.Message}");
             }
         }
 

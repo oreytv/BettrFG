@@ -128,7 +128,7 @@ namespace BetterFG.UI
                     if (GetOpenFileName(ref ofn))
                         result = ofn.lpstrFile.Split('\0')[0];
                 }
-                catch (Exception ex) { Debug.LogError("[WinDialogs] PickPng: " + ex.Message); }
+                catch (Exception ex) { Plugin.Log.LogError("WinDialogs: PickPng: " + ex.Message); }
                 _mainQueue.Enqueue(() => callback(result));
             });
 
@@ -154,7 +154,7 @@ namespace BetterFG.UI
                     if (GetOpenFileName(ref ofn))
                         result = ofn.lpstrFile.Split('\0')[0];
                 }
-                catch (Exception ex) { Debug.LogError("[WinDialogs] PickImage: " + ex.Message); }
+                catch (Exception ex) { Plugin.Log.LogError("WinDialogs: PickImage: " + ex.Message); }
                 _mainQueue.Enqueue(() => callback(result));
             });
 
@@ -179,7 +179,7 @@ namespace BetterFG.UI
                     if (GetOpenFileName(ref ofn))
                         result = ofn.lpstrFile.Split('\0')[0];
                 }
-                catch (Exception ex) { Debug.LogError("[WinDialogs] PickAudio: " + ex.Message); }
+                catch (Exception ex) { Plugin.Log.LogError("WinDialogs: PickAudio: " + ex.Message); }
                 _mainQueue.Enqueue(() => callback(result));
             });
 
@@ -204,7 +204,7 @@ namespace BetterFG.UI
                     if (GetOpenFileName(ref ofn))
                         result = ofn.lpstrFile.Split('\0')[0];
                 }
-                catch (Exception ex) { Debug.LogError("[WinDialogs] PickFile: " + ex.Message); }
+                catch (Exception ex) { Plugin.Log.LogError("WinDialogs: PickFile: " + ex.Message); }
                 _mainQueue.Enqueue(() => callback(result));
             });
 
@@ -231,7 +231,7 @@ namespace BetterFG.UI
                     if (GetSaveFileName(ref ofn))
                         result = ofn.lpstrFile.Split('\0')[0];
                 }
-                catch (Exception ex) { Debug.LogError("[WinDialogs] SaveFile: " + ex.Message); }
+                catch (Exception ex) { Plugin.Log.LogError("WinDialogs: SaveFile: " + ex.Message); }
                 _mainQueue.Enqueue(() => callback(result));
             });
 
@@ -259,7 +259,7 @@ namespace BetterFG.UI
                         result = System.IO.Path.GetDirectoryName(picked);
                     }
                 }
-                catch (Exception ex) { Debug.LogError("[WinDialogs] PickFolder: " + ex.Message); }
+                catch (Exception ex) { Plugin.Log.LogError("WinDialogs: PickFolder: " + ex.Message); }
                 _mainQueue.Enqueue(() => callback(result));
             });
 
@@ -270,7 +270,7 @@ namespace BetterFG.UI
             var t = new Thread(() =>
             {
                 try { action(); }
-                catch (Exception ex) { Debug.LogError("[WinDialogs] Thread error: " + ex.Message); }
+                catch (Exception ex) { Plugin.Log.LogError("WinDialogs: Thread error: " + ex.Message); }
             });
             t.SetApartmentState(ApartmentState.STA);
             t.IsBackground = true;

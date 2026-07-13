@@ -1,4 +1,4 @@
-using LevelEditor;
+﻿using LevelEditor;
 
 namespace BetterFG.UI.Windows.Creative
 {
@@ -11,7 +11,7 @@ namespace BetterFG.UI.Windows.Creative
         public static int SetVisible(bool visible)
         {
             var sel = LevelEditorMultiSelectionHandler.Selection();
-            if (sel == null) { Plugin.Log.LogWarning("[BatchVisibility] no selection"); return 0; }
+            if (sel == null) { Plugin.Log.LogWarning("BatchVisibility: no selection"); return 0; }
 
             var entry = BatchEditHistory.Begin(visible ? "set visible" : "set invisible");
             int touched = 0, noParam = 0;
@@ -28,7 +28,7 @@ namespace BetterFG.UI.Windows.Creative
                 touched++;
             }
             BatchEditHistory.Push(entry);
-            Plugin.Log.LogInfo($"[BatchVisibility] {(visible ? "visible" : "invisible")} -> {touched} set, {noParam} no-visibility-param");
+            Plugin.Log.LogInfo($"BatchVisibility: {(visible ? "visible" : "invisible")} -> {touched} set, {noParam} no-visibility-param");
             return touched;
         }
     }

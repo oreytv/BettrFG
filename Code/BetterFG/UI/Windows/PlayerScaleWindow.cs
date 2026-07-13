@@ -99,16 +99,14 @@ namespace BetterFG.UI.Windows
             float scale = Mathf.Clamp(_slider.value, 0.5f, 1.5f);
             PlayerScaleService.SavePlayerScale(scale);
 
-            var app = CustomizationServices.ApplicationService;
-            if (app != null)
-            {
-                foreach (var slot in app.GetActiveSlots())
+            var local = BetterFG.Network.RemoteProfileStore.LocalLoadout();
+            if (local != null)
+                foreach (var entry in local.skins)
                 {
-                    if (slot?.skinInfo == null || string.IsNullOrEmpty(slot.skinInfo.file)) continue;
-                    if (slot.type != BetterFG.Customization.Player.SkinType.Costume) continue;
-                    SettingsService.SetSkinScale(slot.skinInfo.file, scale);
+                    if (string.IsNullOrEmpty(entry.file)) continue;
+                    if (BetterFG.Customization.Player.SkinTypeParser.FromString(entry.type) != BetterFG.Customization.Player.SkinType.Costume) continue;
+                    SettingsService.SetSkinScale(entry.file, scale);
                 }
-            }
 
             PlayerScaleService.ApplyToAll(scale, PlayerScaleService.ScaleReason.Manual);
         }

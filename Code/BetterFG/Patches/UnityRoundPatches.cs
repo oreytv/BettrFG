@@ -92,7 +92,7 @@ namespace BetterFG.Patches.BettrFGRounds
                 if (climbUp == null) return;
                 BeanMonitorService.Instance?.StartCoroutine(DoClimbUp(__instance, climbUp).WrapToIl2Cpp());
             }
-            catch (Exception ex) { Debug.LogWarning($"[MantleClimbUp] {ex.Message}"); }
+            catch (Exception ex) { Plugin.Log.LogWarning($"MantleClimbUp: {ex.Message}"); }
         }
 
         private static IEnumerator DoClimbUp(MotorFunctionMantleStateGrab instance, MotorFunctionState climbUp)
@@ -185,9 +185,9 @@ namespace BetterFG.Patches.BettrFGRounds
                 var teleportFunc = __instance.MotorAgent?.GetMotorFunction<MotorFunctionTeleport>();
                 if (teleportFunc == null) return;
                 teleportFunc.TeleportPosition = pos.Value;
-                Plugin.Log.LogInfo($"[TeleportRespawn] -> {pos.Value}");
+                Plugin.Log.LogInfo($"teleport respawn -> {pos.Value}");
             }
-            catch (Exception ex) { Plugin.Log.LogWarning($"[TeleportRespawn] {ex.Message}"); }
+            catch (Exception ex) { Plugin.Log.LogWarning($"teleport respawn: {ex.Message}"); }
         }
     }
 

@@ -24,19 +24,19 @@ namespace BetterFG.Features.TimePlacement
     // entries get filled in as players finish (HandlePlayerFinished patch lives in its own class).
     internal static class FeatureTimePlacement
     {
-        public static readonly bfgfeature feature = new bfgfeature("timeplacement", "In-game leaderboard", false, new List<featuresetting>
+        public static readonly BfgFeature feature = new BfgFeature("timeplacement", "In-game leaderboard", false, new List<FeatureSetting>
         {
             // also host the list under PlayingState so it's visible during live gameplay.
-            new featuresetting { id = "gameplay", label = "Show in gameplay", defaultOn = true },
+            new FeatureSetting { id = "gameplay", label = "Show in gameplay", defaultOn = true },
             // split squads of 3+ across two lines (two names top, rest below).
-            new featuresetting { id = "twolines", label = "Two lines for big squads", defaultOn = true },
+            new FeatureSetting { id = "twolines", label = "Two lines for big squads", defaultOn = true },
         },
         onOpen: () => OnToggled(),
         onClosed: () => OnToggled(),
         onSettingChanged: (id, val) => OnToggled(),
-        choices: new List<featurechoice>
+        choices: new List<FeatureChoice>
         {
-            new featurechoice
+            new FeatureChoice
             {
                 id = "showeliminated",
                 label = "Show eliminated players",
@@ -44,7 +44,7 @@ namespace BetterFG.Features.TimePlacement
                 optionLabels = new List<string> { "Always", "Only in Survival", "Never" },
                 defaultId = "always",
             },
-            new featurechoice
+            new FeatureChoice
             {
                 id = "soloinsquad",
                 label = "Prefer per-player score over squads",
@@ -79,7 +79,7 @@ namespace BetterFG.Features.TimePlacement
             return true;
         }
 
-        public static bool On(string setting) => featureRegistry.IsOn("timeplacement", setting);
+        public static bool On(string setting) => FeatureRegistry.IsOn("timeplacement", setting);
 
         // is the feature actually allowed to show right now? (just the master enable now).
         static bool Enabled => feature.enabled;

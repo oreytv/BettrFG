@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using BetterFG.Features;
 using BetterFG.UI;
 using BetterFG.Utilities;
@@ -7,9 +7,9 @@ using UnityEngine.UI;
 
 namespace BetterFG.UI.Tab
 {
-    public class featuresTab : BetterFGTab
+    public class FeaturesTab : BetterFGTab
     {
-        public featuresTab(IntPtr ptr) : base(ptr) { }
+        public FeaturesTab(IntPtr ptr) : base(ptr) { }
 
         public override string TabTitle => "Features";
 
@@ -43,7 +43,7 @@ namespace BetterFG.UI.Tab
         {
             if (_wasOpen == IsOpen) return;
             _wasOpen = IsOpen;
-            var all = featureRegistry.all;
+            var all = FeatureRegistry.all;
             for (int i = 0; i < all.Count; i++)
             {
                 if (IsOpen) all[i].OnOpen();
@@ -111,7 +111,7 @@ namespace BetterFG.UI.Tab
             for (int i = _listRt.childCount - 1; i >= 0; i--)
                 Destroy(_listRt.GetChild(i).gameObject);
 
-            var all = featureRegistry.all;
+            var all = FeatureRegistry.all;
             for (int i = 0; i < all.Count; i++)
                 BuildFeature(i);
 
@@ -134,7 +134,7 @@ namespace BetterFG.UI.Tab
 
         void BuildFeature(int featureIndex)
         {
-            var feature = featureRegistry.all[featureIndex];
+            var feature = FeatureRegistry.all[featureIndex];
             var rowGo = new GameObject("Feature_" + feature.id);
             rowGo.transform.SetParent(_listRt, false);
             rowGo.AddComponent<RectTransform>();
@@ -187,9 +187,9 @@ namespace BetterFG.UI.Tab
                 BuildMaxRowsRow(feature, rowCount % 2 == 0 ? ROW_BG : Color.clear);
         }
 
-        // renders a featurechoice as a single-select dropdown row, wired straight to the feature's
+        // renders a FeatureChoice as a single-select dropdown row, wired straight to the feature's
         // GetChoice/SetChoice so the saved pick and its onChoiceChanged callback are handled for us.
-        void BuildChoiceRow(bfgfeature feature, featurechoice choice, Color bg)
+        void BuildChoiceRow(BfgFeature feature, FeatureChoice choice, Color bg)
         {
             var rowGo = new GameObject("Choice_" + feature.id + "_" + choice.id);
             rowGo.transform.SetParent(_listRt, false);
@@ -234,7 +234,7 @@ namespace BetterFG.UI.Tab
                 hoverGo.transform.SetSiblingIndex(0);
                 hoverGo.SetActive(false);
 
-                var trig = labelRt.gameObject.AddComponent<tooltipTrigger>();
+                var trig = labelRt.gameObject.AddComponent<TooltipTrigger>();
                 trig.text = choice.hint;
                 trig.hoverImage = hoverGo;
             }
@@ -257,7 +257,7 @@ namespace BetterFG.UI.Tab
                 }), FS_SM, ddW, 20f, true, true, true);
         }
 
-        void BuildMaxRowsRow(bfgfeature feature, Color bg)
+        void BuildMaxRowsRow(BfgFeature feature, Color bg)
         {
             var rowGo = new GameObject("Setting_timeplacement_maxrows");
             rowGo.transform.SetParent(_listRt, false);
@@ -358,7 +358,7 @@ namespace BetterFG.UI.Tab
 
         void BuildSettingRow(int featureIndex, int settingIndex, Color bg)
         {
-            var feature = featureRegistry.all[featureIndex];
+            var feature = FeatureRegistry.all[featureIndex];
             var setting = feature.settings[settingIndex];
             var rowGo = new GameObject("Setting_" + feature.id + "_" + setting.id);
             rowGo.transform.SetParent(_listRt, false);
@@ -393,7 +393,7 @@ namespace BetterFG.UI.Tab
         {
             if (cache != null) return cache;
             try { cache = EmbeddedResourceandUnity.LoadTexture(resource); }
-            catch (Exception ex) { Debug.LogError("[featuresTab] bg load failed: " + ex.Message); }
+            catch (Exception ex) { Plugin.Log.LogError("featuresTab: bg load failed: " + ex.Message); }
             return cache;
         }
     }

@@ -344,7 +344,7 @@ namespace BetterFG.UI.Windows
                 tex.wrapMode = TextureWrapMode.Clamp;
                 return tex;
             }
-            catch (Exception ex) { Debug.LogError($"[Window] {resourceName}: {ex.Message}"); return null; }
+            catch (Exception ex) { Plugin.Log.LogError($"Window: {resourceName}: {ex.Message}"); return null; }
         }
 
         protected static Text MakeLabel(Transform parent, Rect rect, string text, int fs, Color color,

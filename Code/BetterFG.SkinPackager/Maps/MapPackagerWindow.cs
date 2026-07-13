@@ -177,9 +177,9 @@ namespace BetterFG.Editor
                     if (!string.IsNullOrEmpty(skyboxPath))
                     {
                         assetNames.Add(skyboxPath);
-                        Debug.Log($"[MapPackager] including skybox '{skybox.name}' from {skyboxPath}");
+                        Debug.Log($"including skybox '{skybox.name}' from {skyboxPath}");
                     }
-                    else Debug.LogWarning($"[MapPackager] skybox '{skybox.name}' isn't a project asset, can't bundle it");
+                    else Debug.LogWarning($"skybox '{skybox.name}' isn't a project asset, can't bundle it");
                 }
 
                 var builds = new AssetBundleBuild[]
@@ -256,7 +256,7 @@ namespace BetterFG.Editor
         private static void CopyMusic(BetterFGMapAsset map, string dir)
         {
             if (string.IsNullOrEmpty(map.musicFilePath)) return;
-            if (!File.Exists(map.musicFilePath)) { Debug.LogWarning($"[MapPackager] music file not found: {map.musicFilePath}"); return; }
+            if (!File.Exists(map.musicFilePath)) { Debug.LogWarning($"music file not found: {map.musicFilePath}"); return; }
             File.Copy(map.musicFilePath, Path.Combine(dir, Path.GetFileName(map.musicFilePath)), overwrite: true);
         }
 

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using BepInEx.Unity.IL2CPP.Utils.Collections;
@@ -91,13 +91,13 @@ namespace BetterFG.Tweaks
                         path = Path.Combine(Application.streamingAssetsPath, "aa", bundleName);
                     if (!File.Exists(path))
                     {
-                        Plugin.Log?.LogWarning("[Background3dTweak] bundle missing: " + path);
+                        Plugin.Log?.LogWarning("Background3dTweak: bundle missing: " + path);
                         continue;
                     }
 
                     AssetBundle bundle = null;
                     try { bundle = AssetBundle.LoadFromFile(path); }
-                    catch (Exception ex) { Plugin.Log?.LogWarning("[Background3dTweak] bundle load failed: " + ex.Message); }
+                    catch (Exception ex) { Plugin.Log?.LogWarning("Background3dTweak: bundle load failed: " + ex.Message); }
                     if (bundle == null) continue;
 
                     string scenePath = null;
@@ -109,7 +109,7 @@ namespace BetterFG.Tweaks
                     catch { }
                     if (string.IsNullOrEmpty(scenePath))
                     {
-                        Plugin.Log?.LogWarning("[Background3dTweak] no scene in bundle " + bundleName);
+                        Plugin.Log?.LogWarning("Background3dTweak: no scene in bundle " + bundleName);
                         continue;
                     }
 
@@ -133,7 +133,7 @@ namespace BetterFG.Tweaks
 
                     if (!addedScene.IsValid() || !addedScene.isLoaded)
                     {
-                        Plugin.Log?.LogWarning("[Background3dTweak] additive scene not found for " + bundleName);
+                        Plugin.Log?.LogWarning("Background3dTweak: additive scene not found for " + bundleName);
                         continue;
                     }
 
@@ -148,11 +148,11 @@ namespace BetterFG.Tweaks
                             if (t != null) t.position += spawnPosition;
                         SceneManager.MoveGameObjectToScene(_spawnedTerrain, gameplayScene);
                         _spawnedTerrain.SetActive(true);
-                        Plugin.Log?.LogInfo("[Background3dTweak] spawned " + prefabName);
+                        Plugin.Log?.LogInfo("Background3dTweak: spawned " + prefabName);
                     }
                     else
                     {
-                        Plugin.Log?.LogWarning("[Background3dTweak] " + prefabName + " not found in scene");
+                        Plugin.Log?.LogWarning("Background3dTweak: " + prefabName + " not found in scene");
                     }
 
                     // Wait a moment, then disable every root in the additive scene. Something in the
@@ -180,7 +180,7 @@ namespace BetterFG.Tweaks
                             sceneRoot.SetActive(false);
                             disabled++;
                         }
-                        Plugin.Log?.LogInfo("[Background3dTweak] disabled " + disabled + " roots in additive scene '" + target.name + "' (handle " + targetHandle + ")");
+                        Plugin.Log?.LogInfo("Background3dTweak: disabled " + disabled + " roots in additive scene '" + target.name + "' (handle " + targetHandle + ")");
                     }
                 }
             }

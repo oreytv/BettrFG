@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Globalization;
 using BetterFG.Services;
 using HarmonyLib;
@@ -198,7 +198,7 @@ namespace BetterFG.Features.CreativeIncrements
                     if (maxIdx >= 0 && want > maxIdx) want = maxIdx;
                     if (want < 0) want = 0;
 
-                    Plugin.Log?.LogInfo($"[CreativeIncrements] {name} FIX realValue={realValue} want={want} cur={data.SelectedIndex} count={(items != null ? items.Count : -1)}");
+                    Plugin.Log?.LogInfo($"CreativeIncrements: {name} FIX realValue={realValue} want={want} cur={data.SelectedIndex} count={(items != null ? items.Count : -1)}");
 
                     if (data.SelectedIndex != want)
                     {
@@ -210,7 +210,7 @@ namespace BetterFG.Features.CreativeIncrements
             }
             catch (Exception ex)
             {
-                Plugin.Log?.LogWarning("[CreativeIncrements] onopen fix failed " + ex.Message);
+                Plugin.Log?.LogWarning("CreativeIncrements: onopen fix failed " + ex.Message);
             }
         }
     }

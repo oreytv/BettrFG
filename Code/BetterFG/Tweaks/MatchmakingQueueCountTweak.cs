@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using BepInEx.Unity.IL2CPP.Utils.Collections;
 using FGClient;
@@ -30,20 +30,20 @@ namespace BetterFG.Tweaks
         {
             _matchmaking = true;
             _queuedPlayers = 0;
-            Plugin.Log.LogInfo("[MatchmakingQueueCount] matchmaking started");
+            Plugin.Log.LogInfo("MatchmakingQueueCount: matchmaking started");
         }
 
         internal static void OnMatchmakingEnd()
         {
             _matchmaking = false;
             DestroyLabel();
-            Plugin.Log.LogInfo("[MatchmakingQueueCount] matchmaking ended");
+            Plugin.Log.LogInfo("MatchmakingQueueCount: matchmaking ended");
         }
 
         internal static void OnQueuedPlayersUpdate(int count)
         {
             _queuedPlayers = count;
-            Plugin.Log.LogInfo($"[MatchmakingQueueCount] queue count: {count}");
+            Plugin.Log.LogInfo($"MatchmakingQueueCount: queue count: {count}");
 
             var inst = Instance;
             if (inst == null || !inst.IsEnabled) return;
@@ -100,14 +100,14 @@ namespace BetterFG.Tweaks
                         rt.anchoredPosition = new Vector2(0f, srcRt.anchoredPosition.y);
 
                     clone.SetActive(true);
-                    Plugin.Log.LogInfo("[MatchmakingQueueCount] label created");
+                    Plugin.Log.LogInfo("MatchmakingQueueCount: label created");
                     yield break;
                 }
 
                 yield return new WaitForSeconds(0.25f);
                 elapsed += 0.25f;
             }
-            Plugin.Log.LogWarning("[MatchmakingQueueCount] timed out finding PlayerNumText");
+            Plugin.Log.LogWarning("MatchmakingQueueCount: timed out finding PlayerNumText");
         }
     }
 

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using BepInEx.Unity.IL2CPP.Utils.Collections;
 using BetterFG.Customization.Menu;
@@ -69,7 +69,7 @@ namespace BetterFG.Patches
                 if (t != null && t.name == "TopLeft_Group") { group = t; break; }
             if (group == null) return;
             try { MenuCustomizationApplication.Instance?.ReapplyForegroundFromSettings(group); }
-            catch (Exception ex) { Debug.LogWarning("[ScreenBg] fg apply to TopLeft_Group: " + ex.Message); }
+            catch (Exception ex) { Plugin.Log.LogWarning("ScreenBg: fg apply to TopLeft_Group: " + ex.Message); }
         }
     }
 
@@ -86,7 +86,7 @@ namespace BetterFG.Patches
             var loading = __instance.TryCast<LoadingGameScreenViewModel>();
             if (loading != null)
             {
-                Debug.Log($"[ScreenBg] DoFadeIn caught loading screen {loading.GetType().Name}, screen={LoadingScreenBg.ScreenFor(loading)}");
+                Plugin.Log.LogInfo($"ScreenBg: DoFadeIn caught loading screen {loading.GetType().Name}, screen={LoadingScreenBg.ScreenFor(loading)}");
                 LoadingScreenBg.Active = loading;
                 LoadingScreenBg.Dispatch(loading);
                 return;
@@ -95,7 +95,7 @@ namespace BetterFG.Patches
             var reveal = __instance.TryCast<RoundRevealCarouselViewModel>();
             if (reveal != null)
             {
-                Debug.Log("[ScreenBg] DoFadeIn caught RoundRevealCarouselViewModel");
+                Plugin.Log.LogInfo("ScreenBg: DoFadeIn caught RoundRevealCarouselViewModel");
                 RoundRevealBg.Dispatch(reveal);
                 BetterFG.Tweaks.LeaveOnLoadingScreenTweak.OnExternalLeaveTriggerEnd();
             }

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using BetterFG;
 using FG.Common;
 using FallGuysLib.Players;
@@ -43,7 +43,7 @@ namespace BetterFG.Utilities
             }
             catch (System.Exception ex)
             {
-                Plugin.Log.LogError("[BeanNetworkUtil] GetRemotePlayerBeansSorted: " + ex.Message);
+                Plugin.Log.LogError("BeanNetworkUtil: GetRemotePlayerBeansSorted: " + ex.Message);
             }
 
             return result;
@@ -68,7 +68,7 @@ namespace BetterFG.Utilities
             }
             catch (System.Exception ex)
             {
-                Plugin.Log.LogError("[BeanNetworkUtil] TryGetPlayerKeyForBean: " + ex.Message);
+                Plugin.Log.LogError("BeanNetworkUtil: TryGetPlayerKeyForBean: " + ex.Message);
             }
 
             return null;

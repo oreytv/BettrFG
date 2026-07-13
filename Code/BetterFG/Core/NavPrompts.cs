@@ -315,6 +315,7 @@ namespace BetterFG.Core
         private static int _focusCachedFrame = -1;
         private static bool _focusCachedResult;
         private static GameObject _focusBanners;
+        private static GameObject _focusScoring;
         private static readonly Transform[] _focusRootTransforms = new Transform[2];
         private static readonly FocusableViewModel[] _focusVms = new FocusableViewModel[2];
         private static readonly string[] _focusRootPaths = { "UICanvas_Client_V2(Clone)/Default", "UICanvas_Client_V2(Clone)/LoadingScreen" };
@@ -335,6 +336,12 @@ namespace BetterFG.Core
             if (_focusBanners == null)
                 _focusBanners = GameObject.Find("UICanvas_Client_V2(Clone)/Default/InGameUiManager(Clone)/GameStates/BannersState");
             if (_focusBanners != null && _focusBanners.activeInHierarchy) return true;
+
+            // spectating: the scoring-feedback surface owns focus, and its own FocusableViewModel
+            // isn't the one the child walk below latches onto, so prompts got gated out
+            if (_focusScoring == null)
+                _focusScoring = GameObject.Find("UICanvas_Client_V2(Clone)/Default/Generic_UI_ScoringFeedback(Clone)");
+            if (_focusScoring != null && _focusScoring.activeInHierarchy) return true;
 
             for (int r = 0; r < _focusRootPaths.Length; r++)
             {

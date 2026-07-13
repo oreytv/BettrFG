@@ -21,7 +21,7 @@ namespace BetterFG.Services
         void Awake()
         {
             Instance = this;
-            Debug.Log("[PlayerScale] awake");
+            Plugin.Log.LogInfo("PlayerScale: awake");
         }
 
         // ── Public API ────────────────────────────────────────────────────────
@@ -39,7 +39,7 @@ namespace BetterFG.Services
             scale = Mathf.Clamp(scale, 0.5f, 1.5f);
             SettingsService.Set(KEY_PLAYER_SCALE, scale.ToString(System.Globalization.CultureInfo.InvariantCulture));
             SettingsService.Set(KEY_SCALE_USERSET, "true");
-            Debug.Log($"[PlayerScale] saved scale: {scale}");
+            Plugin.Log.LogInfo($"PlayerScale: saved scale: {scale}");
         }
 
         // saves skin-driven scale without flagging it as user-set
@@ -47,7 +47,7 @@ namespace BetterFG.Services
         {
             scale = Mathf.Clamp(scale, 0.5f, 1.5f);
             SettingsService.Set(KEY_PLAYER_SCALE, scale.ToString(System.Globalization.CultureInfo.InvariantCulture));
-            Debug.Log($"[PlayerScale] saved skin scale: {scale}");
+            Plugin.Log.LogInfo($"PlayerScale: saved skin scale: {scale}");
         }
 
         public static bool HasUserSetScale() => SettingsService.Get(KEY_SCALE_USERSET, "false") == "true";
@@ -74,12 +74,14 @@ namespace BetterFG.Services
             if (applying != null && !string.IsNullOrEmpty(applying.file))
                 return (applying.file, applying.skinScale > 0f ? applying.skinScale : 0f);
 
-            var app = CustomizationServices.ApplicationService;
-            if (app != null)
-                foreach (var slot in app.GetActiveSlots())
-                    if (slot?.type == BetterFG.Customization.Player.SkinType.Costume
-                        && slot.skinInfo != null && !string.IsNullOrEmpty(slot.skinInfo.file))
-                        return (slot.skinInfo.file, slot.skinInfo.skinScale > 0f ? slot.skinInfo.skinScale : 0f);
+            // equipped loadout comes from the profile store (skin.multi.*), not live scene slots.
+            // the baked per-costume scale is saved alongside as skin.<file>.scale.
+            var local = BetterFG.Network.RemoteProfileStore.LocalLoadout();
+            if (local != null)
+                foreach (var entry in local.skins)
+                    if (BetterFG.Customization.Player.SkinTypeParser.FromString(entry.type) == BetterFG.Customization.Player.SkinType.Costume
+                        && !string.IsNullOrEmpty(entry.file))
+                        return (entry.file, SettingsService.TryGetSkinScale(entry.file, out float sc) ? sc : 0f);
             return (null, 0f);
         }
 
@@ -147,7 +149,7 @@ namespace BetterFG.Services
                 wrapper.localScale = new Vector3(resolved, resolved, resolved);
             else
                 ghost.transform.localScale = new Vector3(resolved, resolved, resolved);
-            Plugin.Log.LogInfo($"[scale] ghost '{ghost.name}' -> {resolved} (wrapper={(wrapper != null)})");
+            Plugin.Log.LogInfo($"scale: ghost '{ghost.name}' -> {resolved} (wrapper={(wrapper != null)})");
         }
 
         public static void ApplyToAll(float? overrideScale = null, ScaleReason reason = ScaleReason.Auto)
@@ -181,7 +183,6 @@ namespace BetterFG.Services
         {
             if (bean == null) return;
             int id = bean.GetInstanceID();
-            Debug.Log($"[PlayerScale] ScaleBean '{bean.name}' mode={mode} scale={scale}");
 
             if (mode == BeanScaleMode.Local)
             {
@@ -190,7 +191,9 @@ namespace BetterFG.Services
                 // only "what you asked for", so we can tell you when a public round overrode it.
                 float resolved = ResolveLocalScale(applyingCostume);
                 bool inRound = IsInRoundBean(bean);
-                Plugin.Log.LogInfo($"[scale] local bean '{bean.name}' inRound={inRound} passed={scale} resolved={resolved} reason={reason}");
+                // only worth a line when we didn't give you what you asked for
+                if (!Mathf.Approximately(resolved, scale))
+                    Plugin.Log.LogInfo($"{bean.name} wanted {scale}, got {resolved} (inRound={inRound}, {reason})");
                 if (reason == ScaleReason.Manual && InLivePublicRound() && !Mathf.Approximately(resolved, scale))
                     UI.BetterFGUIMan.Instance?.ShowTooltipTimed("Couldn't scale you, you're in a public lobby.", 2f);
 
@@ -219,7 +222,7 @@ namespace BetterFG.Services
                         if (ikController != null)
                         {
                             ikController.enabled = false;
-                            Debug.Log($"[PlayerScale] destroyed ik on {bean.name}");
+                            Plugin.Log.LogInfo($"PlayerScale: destroyed ik on {bean.name}");
                         }
                     }
                 }
@@ -237,7 +240,7 @@ namespace BetterFG.Services
             Transform character = bean.transform.Find("Character");
             if (character == null)
             {
-                Debug.LogWarning($"[PlayerScale] no 'Character' child on {bean.name}");
+                Plugin.Log.LogWarning($"PlayerScale: no 'Character' child on {bean.name}");
                 return null;
             }
 
@@ -259,7 +262,7 @@ namespace BetterFG.Services
             character.localRotation = Quaternion.identity;
 
             _wrappers[id] = wrapperGo.transform;
-            Debug.Log($"[PlayerScale] wrapper created for {bean.name}");
+            Plugin.Log.LogInfo($"PlayerScale: wrapper created for {bean.name}");
             return wrapperGo.transform;
         }
 

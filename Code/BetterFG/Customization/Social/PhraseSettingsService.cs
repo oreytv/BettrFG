@@ -54,7 +54,7 @@ namespace BetterFG.Customization.Social
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[PhraseSettings] Load failed: {ex.Message}");
+                Plugin.Log.LogError($"PhraseSettings: Load failed: {ex.Message}");
             }
 
             return list;
@@ -80,7 +80,7 @@ namespace BetterFG.Customization.Social
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[PhraseSettings] Save failed: {ex.Message}");
+                Plugin.Log.LogError($"PhraseSettings: Save failed: {ex.Message}");
             }
         }
     }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Reflection;
 using BepInEx.Unity.IL2CPP.Utils.Collections;
@@ -169,7 +169,7 @@ namespace BetterFG.UI.Tab
                     sp = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
                 }
             }
-            catch (Exception ex) { Debug.LogError("[UITab] screen sprite load failed: " + ex.Message); }
+            catch (Exception ex) { Plugin.Log.LogError("UITab: screen sprite load failed: " + ex.Message); }
             _screenSprites[file] = sp;
             return sp;
         }
@@ -209,7 +209,7 @@ namespace BetterFG.UI.Tab
                 tex.wrapMode = TextureWrapMode.Clamp;
                 cache = tex;
             }
-            catch (Exception ex) { Debug.LogError("[BetterFG] Tex load failed: " + ex.Message); }
+            catch (Exception ex) { Plugin.Log.LogError("BetterFG: Tex load failed: " + ex.Message); }
             return cache;
         }
 

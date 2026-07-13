@@ -39,7 +39,7 @@ namespace BetterFG.Tweaks
         {
             new TweakIncrement
             {
-                Label = "Max notifications", Min = 1, Max = 30, Wrap = false,
+                Label = "Max notifications", Min = 1, Max = 30, Wrap = true,
                 Get = () => Max,
                 Set = v => { Max = v; },
             }

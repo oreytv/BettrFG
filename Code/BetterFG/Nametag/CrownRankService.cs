@@ -124,11 +124,11 @@ namespace BetterFG.Nametag
             // config-tab preview clone. resolve from whichever this is.
             var go = display != null ? display.TryCast<PlayerInfoDisplayGameObject>() : null;
             var canvas = go == null && display != null ? display.TryCast<PlayerInfoDisplayCanvas>() : null;
-            if (go == null && canvas == null) { if (cfg.enabled) Debug.LogWarning("crownrank: no local PlayerInfoDisplay to drive"); return; }
+            if (go == null && canvas == null) { if (cfg.enabled) Plugin.Log.LogWarning("crownrank: no local PlayerInfoDisplay to drive"); return; }
 
             var helper = go != null ? go._crownRankPlayerTagLayoutHelper : canvas._crownRankPlayerTagLayoutHelper;
             var badge = go != null ? go._crownRankBadgeViewModel : canvas._crownRankBadgeViewModel;
-            if (badge == null) { if (cfg.enabled) Debug.LogWarning("crownrank: local display has no _crownRankBadgeViewModel"); return; }
+            if (badge == null) { if (cfg.enabled) Plugin.Log.LogWarning("crownrank: local display has no _crownRankBadgeViewModel"); return; }
 
             if (!DriveBadge(badge, cfg)) return;   // reverted (feature off)
             if (helper != null && !cfg.enabled) helper.CenterNameAndCrownRank();
@@ -203,7 +203,7 @@ namespace BetterFG.Nametag
                     if (tmp != null) tmp.fontMaterial = snap.tmpMat;
                 }
             }
-            Debug.Log($"crownrank applied — text {(cfg.textOn && !string.IsNullOrEmpty(cfg.text) ? cfg.text : "(game)")}, main {ColorUtility.ToHtmlStringRGB(cfg.main)}");
+            Plugin.Log.LogInfo($"crownrank applied — text {(cfg.textOn && !string.IsNullOrEmpty(cfg.text) ? cfg.text : "(game)")}, main {ColorUtility.ToHtmlStringRGB(cfg.main)}");
             return true;
         }
 
@@ -372,7 +372,7 @@ namespace BetterFG.Nametag
             if (csf != null) csf.enabled = snap.csfOn;
             root.localPosition = snap.pos;
             _pristine.Remove(badge.GetInstanceID());
-            Debug.Log("crownrank reverted badge to the game's original state");
+            Plugin.Log.LogInfo("crownrank reverted badge to the game's original state");
         }
 
         static Sprite SpriteOf(Transform t)
@@ -396,7 +396,7 @@ namespace BetterFG.Nametag
         static void ApplyTextOutline(Transform root, Color outline)
         {
             var tmp = root.GetComponentInChildren<TMP_Text>(true);
-            if (tmp == null) { Debug.LogWarning("crownrank: no TMP label under the badge to recolour"); return; }
+            if (tmp == null) { Plugin.Log.LogWarning("crownrank: no TMP label under the badge to recolour"); return; }
 
             var inst = new Material(tmp.fontMaterial);
             inst.SetColor("_OutlineColor", outline);
@@ -418,12 +418,12 @@ namespace BetterFG.Nametag
         static void RecolourChild(Transform root, string path, Color main, Color highlight)
         {
             var t = root.Find(path);
-            if (t == null) { Debug.LogWarning($"crownrank: badge child '{path}' not found"); return; }
+            if (t == null) { Plugin.Log.LogWarning($"crownrank: badge child '{path}' not found"); return; }
 
             var img = t.GetComponent<Image>();
             var sr = img == null ? t.GetComponent<SpriteRenderer>() : null;
             var cur = img != null ? img.sprite : (sr != null ? sr.sprite : null);
-            if (cur == null) { Debug.LogWarning($"crownrank: '{path}' has no Image/SpriteRenderer sprite to recolour"); return; }
+            if (cur == null) { Plugin.Log.LogWarning($"crownrank: '{path}' has no Image/SpriteRenderer sprite to recolour"); return; }
 
             int id = (img != null ? (Component)img : sr).GetInstanceID();
             if (!_snaps.TryGetValue(id, out var snap) || snap.gameSprite == null)

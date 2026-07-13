@@ -4,7 +4,7 @@ using BetterFG.Services;
 
 namespace BetterFG.Features
 {
-    public class featuresetting
+    public class FeatureSetting
     {
         public string id;
         public string label;
@@ -14,7 +14,7 @@ namespace BetterFG.Features
     // a multi-option setting that renders as a dropdown in the features tab (instead of an ON/OFF
     // toggle). optionIds are what get stored; optionLabels are what the dropdown shows. keep the two
     // lists the same length and order. defaultId is the option selected when nothing's saved yet.
-    public class featurechoice
+    public class FeatureChoice
     {
         public string id;
         public string label;
@@ -26,20 +26,20 @@ namespace BetterFG.Features
         public string hint;
     }
 
-    public class bfgfeature
+    public class BfgFeature
     {
         public readonly string id;
         public readonly string title;
         public readonly string note;
         public readonly bool defaultOn;
-        public readonly List<featuresetting> settings;
-        public readonly List<featurechoice> choices;
+        public readonly List<FeatureSetting> settings;
+        public readonly List<FeatureChoice> choices;
         readonly Action _onOpen;
         readonly Action _onClosed;
         readonly Action<string, bool> _onSettingChanged;
         readonly Action<string, string> _onChoiceChanged;
 
-        public bfgfeature(string id, string title, bool defaultOn = true, List<featuresetting> settings = null, string note = "", Action onOpen = null, Action onClosed = null, Action<string, bool> onSettingChanged = null, List<featurechoice> choices = null, Action<string, string> onChoiceChanged = null)
+        public BfgFeature(string id, string title, bool defaultOn = true, List<FeatureSetting> settings = null, string note = "", Action onOpen = null, Action onClosed = null, Action<string, bool> onSettingChanged = null, List<FeatureChoice> choices = null, Action<string, string> onChoiceChanged = null)
         {
             this.id = id;
             this.title = title;
@@ -90,7 +90,7 @@ namespace BetterFG.Features
             OnSettingChanged(settingId, on);
         }
 
-        featuresetting Find(string settingId)
+        FeatureSetting Find(string settingId)
         {
             var list = settings;
             if (list == null) return null;
@@ -116,7 +116,7 @@ namespace BetterFG.Features
             OnChoiceChanged(choiceId, optionId);
         }
 
-        featurechoice FindChoice(string choiceId)
+        FeatureChoice FindChoice(string choiceId)
         {
             var list = choices;
             if (list == null) return null;

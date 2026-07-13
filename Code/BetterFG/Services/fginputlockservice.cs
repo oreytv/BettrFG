@@ -15,7 +15,7 @@ namespace BetterFG.Services
     //     which verifies the selected field lives under our canvas so a focused
     //     Fall Guys input field never trips it)
     //   - our fake text fields (custom carets, no real InputField) driven by the tabs
-    public static class fginputlockservice
+    public static class FGInputLockService
     {
         private static bool _realFieldLock;
         private static bool _fakeFieldLock;

@@ -41,7 +41,7 @@ namespace BetterFG.Features.UnityRound.Behaviours
             var cccc = BetterFGUnityRounds.CcccTransform;
             if (cccc == null)
             {
-                Debug.LogWarning("[CustomEndzoneTrigger] CCCC not set, skipping qualify sequence");
+                Plugin.Log.LogWarning("CustomEndzoneTrigger: CCCC not set, skipping qualify sequence");
                 yield break;
             }
 
@@ -57,7 +57,7 @@ namespace BetterFG.Features.UnityRound.Behaviours
                 uint localId = PlayerUtils.GetLocalPlayerId();
                 fgcc = PlayerUtils.GetPlayerController(localId);
             }
-            catch (System.Exception ex) { Debug.LogWarning($"[CustomEndzoneTrigger] teleport failed: {ex.Message}"); }
+            catch (System.Exception ex) { Plugin.Log.LogWarning($"CustomEndzoneTrigger: teleport failed: {ex.Message}"); }
 
             if (fgcc != null)
                 yield return PlayerUtils.ForceTeleport(fgcc, cccc).WrapToIl2Cpp();

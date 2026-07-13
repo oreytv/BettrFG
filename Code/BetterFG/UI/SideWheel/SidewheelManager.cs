@@ -114,7 +114,7 @@ namespace BetterFG.UI.SideWheel
             where T : BetterFGWindow
         {
             int idx = _entries.FindIndex(e => e.label == label);
-            if (idx < 0) { Debug.LogWarning($"sidewheel: no entry '{label}' to open"); return; }
+            if (idx < 0) { Plugin.Log.LogWarning($"sidewheel: no entry '{label}' to open"); return; }
 
             if (!_wheelVisible) SetWheelVisible(true);
             // if this window's already the open one, don't re-open (that would toggle it shut) — just re-run
@@ -571,7 +571,7 @@ namespace BetterFG.UI.SideWheel
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[SideWheel] LoadEmbedded {resourceName}: {ex.Message}");
+                Plugin.Log.LogError($"SideWheel: LoadEmbedded {resourceName}: {ex.Message}");
                 return null;
             }
         }

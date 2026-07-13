@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using BetterFG.Core;
 using FallGuysLib.UI;
 using FG.Common;
@@ -57,7 +57,7 @@ namespace BetterFG.Tweaks
             if (ActiveEliminatedBannerClose != null)
             {
                 try { ActiveEliminatedBannerClose(); }
-                catch (Exception ex) { Plugin.Log?.LogWarning("[LeaveOnLoading] banner OnClosed: " + ex.Message); }
+                catch (Exception ex) { Plugin.Log?.LogWarning("LeaveOnLoading: banner OnClosed: " + ex.Message); }
                 ActiveEliminatedBannerClose = null;
                 OnExternalLeaveTriggerEnd();
                 DestroyPrompt();
@@ -153,7 +153,7 @@ namespace BetterFG.Tweaks
             if (ActiveEliminatedBannerClose != null)
             {
                 try { ActiveEliminatedBannerClose(); }
-                catch (Exception ex) { Plugin.Log?.LogWarning("[LeaveOnLoading] banner OnClosed: " + ex.Message); }
+                catch (Exception ex) { Plugin.Log?.LogWarning("LeaveOnLoading: banner OnClosed: " + ex.Message); }
                 ActiveEliminatedBannerClose = null;
                 return;
             }
@@ -191,7 +191,7 @@ namespace BetterFG.Tweaks
                     }
                 }
             }
-            catch (Exception ex) { Plugin.Log?.LogWarning("[LeaveOnLoading] StopAmbienceMuteSnapshot failed: " + ex.Message); }
+            catch (Exception ex) { Plugin.Log?.LogWarning("LeaveOnLoading: StopAmbienceMuteSnapshot failed: " + ex.Message); }
         }
 
         // external triggers (e.g. StateQualificationScreen.Teardown) flip this on so the leave

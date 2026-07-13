@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using BetterFG.UI.Windows;
 using FG.Common;
@@ -191,7 +191,7 @@ namespace BetterFG.Features.UnityRound.Editor
             // remember this round for the current creative level so it auto-loads next time
             CreativeRoundMemory.RememberLoaded(jsonPath);
 
-            Debug.Log($"[UnityRoundLoader] loaded '{instance.name}' from {jsonPath}");
+            Plugin.Log.LogInfo($"UnityRoundLoader: loaded '{instance.name}' from {jsonPath}");
             return true;
         }
 
@@ -202,10 +202,10 @@ namespace BetterFG.Features.UnityRound.Editor
             {
                 var asset = bundle.LoadAsset(skyboxName);
                 var mat = asset != null ? asset.TryCast<Material>() : null;
-                if (mat == null) Debug.LogWarning($"[UnityRoundLoader] skybox '{skyboxName}' not in bundle");
+                if (mat == null) Plugin.Log.LogWarning($"UnityRoundLoader: skybox '{skyboxName}' not in bundle");
                 return mat;
             }
-            catch (Exception ex) { Debug.LogWarning($"[UnityRoundLoader] skybox load: {ex.Message}"); return null; }
+            catch (Exception ex) { Plugin.Log.LogWarning($"UnityRoundLoader: skybox load: {ex.Message}"); return null; }
         }
 
         // Manual unload (the UNLOAD button): tear down AND forget the round for this level so it
@@ -253,7 +253,7 @@ namespace BetterFG.Features.UnityRound.Editor
                     if (go != null) return go;
                 }
             }
-            catch (Exception ex) { Debug.LogError($"[UnityRoundLoader] FindPrefab: {ex.Message}"); }
+            catch (Exception ex) { Plugin.Log.LogError($"UnityRoundLoader: FindPrefab: {ex.Message}"); }
             return null;
         }
 

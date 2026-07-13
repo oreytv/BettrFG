@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Reflection;
 using FG.Common;
@@ -107,7 +107,7 @@ namespace BetterFG.Services
             Stop();
             if (string.IsNullOrEmpty(_path) || !File.Exists(_path))
             {
-                Debug.LogWarning($"[MenuMusic] no file at '{_path}'");
+                Plugin.Log.LogWarning($"MenuMusic: no file at '{_path}'");
                 return;
             }
             // file open + mp3 decode init + WaveOutEvent driver init can take a few hundred ms.
@@ -125,7 +125,7 @@ namespace BetterFG.Services
                     WaveStream reader;
                     if (ext == ".mp3") reader = new Mp3FileReader(path);
                     else if (ext == ".wav") reader = new WaveFileReader(path);
-                    else { Debug.LogWarning($"[MenuMusic] unsupported extension '{ext}' (mp3/wav only)"); return; }
+                    else { Plugin.Log.LogWarning($"MenuMusic: unsupported extension '{ext}' (mp3/wav only)"); return; }
 
                     var loop = new LoopStream(reader);
                     var vp = new VolumeWaveProvider16(loop) { Volume = vol };
@@ -146,7 +146,7 @@ namespace BetterFG.Services
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogWarning($"[MenuMusic] play failed: {ex.Message}");
+                    Plugin.Log.LogWarning($"MenuMusic: play failed: {ex.Message}");
                 }
             });
         }

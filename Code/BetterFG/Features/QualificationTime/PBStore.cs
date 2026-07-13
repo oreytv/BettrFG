@@ -61,7 +61,7 @@ namespace BetterFG.Features.QualificationTime
 
         // fired after any mutation (set/feature/delete) so views can refresh themselves
         public static event System.Action OnChanged;
-        static void RaiseChanged() { try { OnChanged?.Invoke(); } catch (System.Exception ex) { Debug.LogWarning("PBStore: OnChanged handler threw: " + ex.Message); } }
+        static void RaiseChanged() { try { OnChanged?.Invoke(); } catch (System.Exception ex) { Plugin.Log.LogWarning("PBStore: OnChanged handler threw: " + ex.Message); } }
 
         // ── show type detection ───────────────────────────────────────────────
         // reads the live ClientGameManager. solos = not a squad show; duos/squads keyed off SquadSize.
@@ -78,7 +78,7 @@ namespace BetterFG.Features.QualificationTime
                     return cgm.SquadSize == 2 ? PbType.Duos : PbType.Squads;
                 }
             }
-            catch (System.Exception ex) { Debug.LogWarning($"PBStore: show type lookup failed: {ex.Message}"); }
+            catch (System.Exception ex) { Plugin.Log.LogWarning($"PBStore: show type lookup failed: {ex.Message}"); }
             return PbType.Solos;
         }
 
@@ -95,11 +95,11 @@ namespace BetterFG.Features.QualificationTime
                 try
                 {
                     changed |= LoadJson(PBObf.Decode(File.ReadAllBytes(path)));
-                    Debug.Log($"PBStore: merged pbs from {path}");
+                    Plugin.Log.LogInfo($"PBStore: merged pbs from {path}");
                 }
                 catch (System.Exception ex)
                 {
-                    Debug.LogWarning($"PBStore: load failed from {path}: {ex.Message}");
+                    Plugin.Log.LogWarning($"PBStore: load failed from {path}: {ex.Message}");
                 }
             }
 
@@ -110,7 +110,7 @@ namespace BetterFG.Features.QualificationTime
             // new shape once so we don't re-migrate every launch.
             if (_cache.Count > 0 || changed)
             {
-                Debug.Log($"PBStore: loaded {_cache.Count} entries, {_featured.Count} featured");
+                Plugin.Log.LogInfo($"PBStore: loaded {_cache.Count} entries, {_featured.Count} featured");
                 Save();
             }
         }
@@ -164,7 +164,7 @@ namespace BetterFG.Features.QualificationTime
             }
             catch (System.Exception ex)
             {
-                Debug.LogWarning($"PBStore: save failed: {ex.Message}");
+                Plugin.Log.LogWarning($"PBStore: save failed: {ex.Message}");
             }
         }
 
@@ -356,10 +356,10 @@ namespace BetterFG.Features.QualificationTime
                         if (File.Exists(newPath)) File.Delete(path);
                         else File.Move(path, newPath);
                     }
-                    catch (System.Exception ex) { Debug.LogWarning($"PBStore: file merge failed {path} -> {newPath}: {ex.Message}"); }
+                    catch (System.Exception ex) { Plugin.Log.LogWarning($"PBStore: file merge failed {path} -> {newPath}: {ex.Message}"); }
                 }
             }
-            catch (System.Exception ex) { Debug.LogWarning($"PBStore: file merge scan failed for {dir}: {ex.Message}"); }
+            catch (System.Exception ex) { Plugin.Log.LogWarning($"PBStore: file merge scan failed for {dir}: {ex.Message}"); }
         }
 
         static bool TryImportOldPbTxt()
@@ -385,12 +385,12 @@ namespace BetterFG.Features.QualificationTime
                     MergeInto(key, new Entry { displayName = name, rawId = name, solos = time, date = nowDate, solosDate = nowDate });
                     changed = true;
                 }
-                if (changed) Debug.Log("PBStore: imported old pb.txt");
+                if (changed) Plugin.Log.LogInfo("PBStore: imported old pb.txt");
                 return changed;
             }
             catch (System.Exception ex)
             {
-                Debug.LogWarning($"PBStore: pb.txt import failed: {ex.Message}");
+                Plugin.Log.LogWarning($"PBStore: pb.txt import failed: {ex.Message}");
                 return false;
             }
         }
@@ -419,7 +419,7 @@ namespace BetterFG.Features.QualificationTime
 
         public static bool TryGet(string id, PbType type, out float time, out string displayName, string displayNameHint = null)
         {
-            if (!BetterFG.Features.featureRegistry.IsOn("pb", "store"))
+            if (!BetterFG.Features.FeatureRegistry.IsOn("pb", "store"))
             {
                 time = 0f;
                 displayName = null;
@@ -481,7 +481,7 @@ namespace BetterFG.Features.QualificationTime
 
         public static bool TrySet(string id, string displayName, PbType type, float time)
         {
-            if (!BetterFG.Features.featureRegistry.IsOn("pb", "store")) return false;
+            if (!BetterFG.Features.FeatureRegistry.IsOn("pb", "store")) return false;
             EnsureLoaded();
             string key = NormalizeKey(id, displayName);
             CollapseIdKey(id, displayName, key);
@@ -515,7 +515,7 @@ namespace BetterFG.Features.QualificationTime
         // fluke time they don't want to defend). bypasses the faster-than gate TrySet enforces.
         public static void ForceSet(string id, string displayName, PbType type, float time)
         {
-            if (!BetterFG.Features.featureRegistry.IsOn("pb", "store")) return;
+            if (!BetterFG.Features.FeatureRegistry.IsOn("pb", "store")) return;
             EnsureLoaded();
             string key = NormalizeKey(id, displayName);
             CollapseIdKey(id, displayName, key);
@@ -553,7 +553,7 @@ namespace BetterFG.Features.QualificationTime
         static Dictionary<string, (string displayName, float time, string rawId)> Project(System.Func<Entry, float?> pick, bool onlyFeatured)
         {
             var result = new Dictionary<string, (string displayName, float time, string rawId)>();
-            if (!BetterFG.Features.featureRegistry.IsOn("pb", "store")) return result;
+            if (!BetterFG.Features.FeatureRegistry.IsOn("pb", "store")) return result;
             EnsureLoaded();
             foreach (var kv in _cache)
             {
@@ -572,7 +572,7 @@ namespace BetterFG.Features.QualificationTime
         public static Dictionary<string, Entry> GetAllEntriesDeduped()
         {
             var result = new Dictionary<string, Entry>();
-            if (!BetterFG.Features.featureRegistry.IsOn("pb", "store")) return result;
+            if (!BetterFG.Features.FeatureRegistry.IsOn("pb", "store")) return result;
             EnsureLoaded();
             foreach (var kv in _cache)
             {
@@ -594,7 +594,7 @@ namespace BetterFG.Features.QualificationTime
 
         public static bool IsFeatured(string id, string displayNameHint = null)
         {
-            if (!BetterFG.Features.featureRegistry.IsOn("pb", "store")) return false;
+            if (!BetterFG.Features.FeatureRegistry.IsOn("pb", "store")) return false;
             EnsureLoaded();
             return _featured.Contains(NormalizeKey(id, displayNameHint));
         }
@@ -602,7 +602,7 @@ namespace BetterFG.Features.QualificationTime
         // toggles featured state, returns new state
         public static bool TryFeature(string id, string displayNameHint = null)
         {
-            if (!BetterFG.Features.featureRegistry.IsOn("pb", "store")) return false;
+            if (!BetterFG.Features.FeatureRegistry.IsOn("pb", "store")) return false;
             EnsureLoaded();
             string key = NormalizeKey(id, displayNameHint);
             if (!_cache.ContainsKey(key)) return false;
@@ -617,7 +617,7 @@ namespace BetterFG.Features.QualificationTime
 
         public static bool TryDelete(string id, string displayNameHint = null)
         {
-            if (!BetterFG.Features.featureRegistry.IsOn("pb", "store")) return false;
+            if (!BetterFG.Features.FeatureRegistry.IsOn("pb", "store")) return false;
             EnsureLoaded();
             bool changed = false;
             string canonicalId = CanonicalRoundId(id);

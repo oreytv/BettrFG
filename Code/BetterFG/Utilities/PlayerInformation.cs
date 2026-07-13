@@ -1,4 +1,4 @@
-﻿using FGClient;
+using FGClient;
 using MPG.Utility;
 using System;
 using UnityEngine;
@@ -11,32 +11,32 @@ namespace BetterFG.Utilities
         {
             if (GlobalGameStateClient.Instance == null)
             {
-                Debug.Log("Instance null");
+                Plugin.Log.LogInfo("Instance null");
                 return null;
             }
 
             var gsv = GlobalGameStateClient.Instance.GameStateView;
             if (gsv == null)
             {
-                Debug.Log("GameStateView null");
+                Plugin.Log.LogInfo("GameStateView null");
                 return null;
             }
 
             if (!gsv.GetLiveClientGameManager(out var cgm) || cgm == null)
             {
-                Debug.Log("cgm null");
+                Plugin.Log.LogInfo("cgm null");
                 return null;
             }
 
             if (cgm._clientPlayerManager == null)
             {
-                Debug.Log("Player manager null");
+                Plugin.Log.LogInfo("Player manager null");
                 return null;
             }
 
             if (cgm._clientPlayerManager._playerNetIdIndex == null)
             {
-                Debug.Log("PlayerNetIdIndex null");
+                Plugin.Log.LogInfo("PlayerNetIdIndex null");
                 return null;
             }
 
@@ -44,7 +44,7 @@ namespace BetterFG.Utilities
             {
                 if (data.value == null)
                 {
-                    Debug.Log($"Null player data for key {data.key}");
+                    Plugin.Log.LogInfo($"Null player data for key {data.key}");
                     continue;
                 }
 
@@ -54,13 +54,13 @@ namespace BetterFG.Utilities
                     var netObj = cgm.GetNetObjectByID(data.key);
                     if (netObj == null)
                     {
-                        Debug.Log($"NetObject null for key {data.key}");
+                        Plugin.Log.LogInfo($"NetObject null for key {data.key}");
                         continue;
                     }
 
                     if (netObj.FGCharacterController == null)
                     {
-                        Debug.Log($"FGCharacterController null for key {data.key}");
+                        Plugin.Log.LogInfo($"FGCharacterController null for key {data.key}");
                         continue;
                     }
 
@@ -68,7 +68,7 @@ namespace BetterFG.Utilities
                 }
             }
 
-            Debug.Log($"No player found matching: {name}");
+            Plugin.Log.LogInfo($"No player found matching: {name}");
             return null;
         }
 

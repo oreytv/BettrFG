@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using System;
@@ -16,7 +16,7 @@ namespace BetterFG.Customization.Player
 
         private Transform playerRoot;
         private Transform customSkinRoot;
-        private readonly List<bonepair> cachedBones = new List<bonepair>();
+        private readonly List<BonePair> cachedBones = new List<BonePair>();
         private int lastSyncFrame = -1;
     
         // When true, prefer mapping custom bones to player bones using the
@@ -43,7 +43,7 @@ namespace BetterFG.Customization.Player
             customBodySmr = null;
 
             RebuildCachedBones();
-            Debug.Log($"[BoneSync] {boneOffsetMap.Count} offsets registered on '{name}'");
+            Plugin.Log.LogInfo($"BoneSync: {boneOffsetMap.Count} offsets registered on '{name}'");
         }
 
         public void SyncNow()
@@ -167,7 +167,7 @@ namespace BetterFG.Customization.Player
                 AddMap("Body_LOD0 (merge)");
                 AddMap("Body_LOD0");
                 AddMap("Main FG/Body_LOD0 (merge)");
-                Debug.Log($"[BoneSync] added remote root mappings for {playerObject.name} -> {playerRoot.name} (playerBones={_playerBonesByName.Count})");
+                Plugin.Log.LogInfo($"BoneSync: added remote root mappings for {playerObject.name} -> {playerRoot.name} (playerBones={_playerBonesByName.Count})");
             }
 
             useSmrBoneMapping = false;
@@ -176,9 +176,9 @@ namespace BetterFG.Customization.Player
             RebuildCachedBones();
 
             if (playerRoot == null || customSkinRoot == null)
-                Debug.LogWarning($"[BoneSync] setup failed on {playerObject.name} - playerRoot={(playerRoot != null ? playerRoot.name : "null")} customRoot={(customSkinRoot != null ? customSkinRoot.name : "null")}");
+                Plugin.Log.LogWarning($"BoneSync: setup failed on {playerObject.name} - playerRoot={(playerRoot != null ? playerRoot.name : "null")} customRoot={(customSkinRoot != null ? customSkinRoot.name : "null")}");
             else
-                Debug.Log($"[BoneSync] ready on {playerObject.name} - playerRoot={playerRoot.name} customRoot={customSkinRoot.name} playerBones={_playerBonesByName.Count} cached={cachedBones.Count}");
+                Plugin.Log.LogInfo($"BoneSync: ready on {playerObject.name} - playerRoot={playerRoot.name} customRoot={customSkinRoot.name} playerBones={_playerBonesByName.Count} cached={cachedBones.Count}");
         }
 
         private void RebuildCachedBones()
@@ -210,7 +210,7 @@ namespace BetterFG.Customization.Player
 
                 if (playerBone != null)
                 {
-                    cachedBones.Add(new bonepair
+                    cachedBones.Add(new BonePair
                     {
                         customBone = customBone,
                         playerBone = playerBone,
@@ -222,9 +222,9 @@ namespace BetterFG.Customization.Player
             }
 
             if (added > 0)
-                Debug.Log($"[BoneSync] SMR-based mapping created with {added} bones for '{name}'");
+                Plugin.Log.LogInfo($"BoneSync: SMR-based mapping created with {added} bones for '{name}'");
             else
-                Debug.LogWarning($"[BoneSync] SMR-based mapping found 0 matches for '{name}'");
+                Plugin.Log.LogWarning($"BoneSync: SMR-based mapping found 0 matches for '{name}'");
         }
 
         private void CollectCachedBones(Transform customBone)
@@ -240,7 +240,7 @@ namespace BetterFG.Customization.Player
                 bool hasOffset = boneOffsetMap.TryGetValue(customBone.name, out Vector3 offset)
                               || boneOffsetMap.TryGetValue(customBone.name.Trim().ToLowerInvariant(), out offset);
 
-                cachedBones.Add(new bonepair
+                cachedBones.Add(new BonePair
                 {
                     customBone = customBone,
                     playerBone = playerBone,
@@ -251,7 +251,7 @@ namespace BetterFG.Customization.Player
                 if (hasOffset && !loggedAppliedBones.Contains(customBone.name))
                 {
                     loggedAppliedBones.Add(customBone.name);
-                    Debug.Log($"[BoneSync] offset on '{customBone.name}': ({offset.x:F3}, {offset.y:F3}, {offset.z:F3})");
+                    Plugin.Log.LogInfo($"BoneSync: offset on '{customBone.name}': ({offset.x:F3}, {offset.y:F3}, {offset.z:F3})");
                 }
             }
 
@@ -277,7 +277,7 @@ namespace BetterFG.Customization.Player
             return null;
         }
 
-        private class bonepair
+        private class BonePair
         {
             public Transform customBone;
             public Transform playerBone;

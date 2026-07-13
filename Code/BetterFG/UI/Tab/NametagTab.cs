@@ -215,7 +215,7 @@ namespace BetterFG.UI.Tab
                 tex.wrapMode = TextureWrapMode.Clamp;
                 cache = tex;
             }
-            catch (Exception ex) { Debug.LogError($"[NametagUI] LoadEmbedded {resourceName}: {ex.Message}"); }
+            catch (Exception ex) { Plugin.Log.LogError($"NametagUI: LoadEmbedded {resourceName}: {ex.Message}"); }
             return cache;
         }
 
@@ -1348,7 +1348,7 @@ namespace BetterFG.UI.Tab
             NametagFinder.ReapplyAllNameplates();
             // refresh the private lobby player list too (name + style on your row)
             BetterFG.Customization.Menu.MenuCustomizationApplication.Instance?.ReapplySpecialForeground(
-                BetterFG.Customization.Menu.MenuCustomizationApplication.specialscreen.PrivateLobbyPlayerList);
+                BetterFG.Customization.Menu.MenuCustomizationApplication.SpecialScreen.PrivateLobbyPlayerList);
         }
 
         private void OnRemove()

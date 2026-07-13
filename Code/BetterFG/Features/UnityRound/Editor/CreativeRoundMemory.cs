@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using BepInEx.Unity.IL2CPP.Utils.Collections;
 using BetterFG.Services;
@@ -92,7 +92,7 @@ namespace BetterFG.Features.UnityRound.Editor
             if (string.IsNullOrEmpty(code)) return;
             SettingsService.Set(KeyFor(code), infoJsonPath);
             if (Instance != null) Instance._autoLoadedFor = code;
-            Debug.Log($"[CreativeRoundMemory] bound round '{infoJsonPath}' to level {code}");
+            Plugin.Log.LogInfo($"CreativeRoundMemory: bound round '{infoJsonPath}' to level {code}");
         }
 
         // call after an unload: forget the round for the current level so it stays gone next time.
@@ -102,7 +102,7 @@ namespace BetterFG.Features.UnityRound.Editor
             if (string.IsNullOrEmpty(code)) return;
             SettingsService.Remove(KeyFor(code));
             if (Instance != null) Instance._autoLoadedFor = code;
-            Debug.Log($"[CreativeRoundMemory] cleared round for level {code}");
+            Plugin.Log.LogInfo($"CreativeRoundMemory: cleared round for level {code}");
         }
 
         // ── auto-load ─────────────────────────────────────────────────────────────
@@ -116,7 +116,7 @@ namespace BetterFG.Features.UnityRound.Editor
 
             if (!System.IO.File.Exists(path))
             {
-                Debug.Log($"[CreativeRoundMemory] saved round for {code} missing on disk: {path}");
+                Plugin.Log.LogInfo($"CreativeRoundMemory: saved round for {code} missing on disk: {path}");
                 _autoLoadedFor = code;
                 return;
             }
@@ -142,9 +142,9 @@ namespace BetterFG.Features.UnityRound.Editor
             if (GetCurrentShareCode() != code) yield break;
 
             if (UnityRoundLoader.LoadFromInfoJson(path, out string error))
-                Debug.Log($"[CreativeRoundMemory] auto-loaded round for {code}: {path}");
+                Plugin.Log.LogInfo($"CreativeRoundMemory: auto-loaded round for {code}: {path}");
             else
-                Debug.LogWarning($"[CreativeRoundMemory] auto-load failed for {code}: {error}");
+                Plugin.Log.LogWarning($"CreativeRoundMemory: auto-load failed for {code}: {error}");
         }
     }
 }

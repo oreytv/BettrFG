@@ -178,7 +178,7 @@ namespace BetterFG.UI.Tab
                 tex.wrapMode = TextureWrapMode.Clamp;
                 cache = tex;
             }
-            catch (Exception ex) { Debug.LogError($"[EmoticonsPhrasesTab] {name}: {ex.Message}"); }
+            catch (Exception ex) { Plugin.Log.LogError($"EmoticonsPhrasesTab: {name}: {ex.Message}"); }
             return cache;
         }
 

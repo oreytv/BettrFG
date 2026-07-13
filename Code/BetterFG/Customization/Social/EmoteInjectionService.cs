@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -97,7 +97,7 @@ namespace BetterFG.Customization.Social
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[EmoteInjection] clip load failed ({e.bundlePath}): {ex.Message}");
+                Plugin.Log.LogWarning($"EmoteInjection: clip load failed ({e.bundlePath}): {ex.Message}");
                 return null;
             }
         }
@@ -185,7 +185,7 @@ namespace BetterFG.Customization.Social
                 CustomClips.Clear();
                 SoundPaths.Clear();
             }
-            catch (Exception ex) { Debug.LogError($"[EmoteInjection] restore: {ex}"); }
+            catch (Exception ex) { Plugin.Log.LogError($"EmoteInjection: restore: {ex}"); }
         }
 
         internal static void InjectSlots(SocialPrimeHandler handler)
@@ -230,7 +230,7 @@ namespace BetterFG.Customization.Social
             catch (Exception ex)
             {
                 LastStatus = $"Error: {ex.Message}";
-                Debug.LogError($"[EmoteInjection] {ex}");
+                Plugin.Log.LogError($"EmoteInjection: {ex}");
             }
         }
 
@@ -571,7 +571,7 @@ namespace BetterFG.Customization.Social
             }
             catch (Exception ex)
             {
-                Debug.LogWarning("[EmoteInjection] EnablePlayerUpperBodyRagdoll failed: " + ex.Message);
+                Plugin.Log.LogWarning("EmoteInjection: EnablePlayerUpperBodyRagdoll failed: " + ex.Message);
             }
         }
 
@@ -598,7 +598,7 @@ namespace BetterFG.Customization.Social
                 output.PlaybackStopped += (_, __) => { output.Dispose(); reader.Dispose(); ms.Dispose(); };
                 _emoteAudio = output;
             }
-            catch (Exception ex) { Debug.LogWarning($"[EmoteInjection] sound failed: {ex.Message}"); }
+            catch (Exception ex) { Plugin.Log.LogWarning($"EmoteInjection: sound failed: {ex.Message}"); }
         }
 
         internal static void StopCustomSound()

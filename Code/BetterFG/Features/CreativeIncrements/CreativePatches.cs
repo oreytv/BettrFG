@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using HarmonyLib;
 
 namespace BetterFG.Features.CreativeIncrements
@@ -23,7 +23,7 @@ namespace BetterFG.Features.CreativeIncrements
             }
             catch (Exception ex)
             {
-                Plugin.Log?.LogWarning("[CreativePatches] carrousel snappy failed " + ex.Message);
+                Plugin.Log?.LogWarning("CreativePatches: carrousel snappy failed " + ex.Message);
             }
         }
     }

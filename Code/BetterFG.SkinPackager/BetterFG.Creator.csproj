@@ -75,7 +75,7 @@
     <Compile Include="Maps\MapInfoJson.cs" />
     <Compile Include="Maps\BetterFGMapAsset.cs" />
     <Compile Include="Maps\BetterFGMapAssetEditor.cs" />
-    <Compile Include="Reference\Referencespawner.cs" />
+    <Compile Include="Reference\ReferenceSpawner.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

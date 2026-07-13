@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Catapult.Protocol;
 using FallGuys.Lobby.Protocol.Client.Lobbies;
@@ -83,13 +83,13 @@ namespace BetterFG.Tweaks
                         continue;
 
                     _lastKick[memberId] = Time.unscaledTime;
-                    Plugin.Log?.LogWarning("[LobbyAutokickTweak] kicking bad name id=" + memberId + " name=" + SafeLabel(name));
+                    Plugin.Log?.LogWarning("LobbyAutokickTweak: kicking bad name id=" + memberId + " name=" + SafeLabel(name));
                     SendKick(lobbyService, memberId);
                 }
             }
             catch (Exception ex)
             {
-                Plugin.Log?.LogError("[LobbyAutokickTweak] failed " + ex);
+                Plugin.Log?.LogError("LobbyAutokickTweak: failed " + ex);
             }
         }
 
@@ -153,7 +153,7 @@ namespace BetterFG.Tweaks
             var obs = lobbyService.HostKickMember(memberId);
             if (obs == null)
             {
-                Plugin.Log?.LogWarning("[LobbyAutokickTweak] kick returned null " + memberId);
+                Plugin.Log?.LogWarning("LobbyAutokickTweak: kick returned null " + memberId);
                 return;
             }
 
@@ -167,12 +167,12 @@ namespace BetterFG.Tweaks
 
         private void OnKickResult(Result<LobbyDto> result)
         {
-            Plugin.Log?.LogInfo("[LobbyAutokickTweak] kick result " + (result == null ? "null" : result.ToString()));
+            Plugin.Log?.LogInfo("LobbyAutokickTweak: kick result " + (result == null ? "null" : result.ToString()));
         }
 
         private void OnKickError(Il2CppSystem.Exception ex)
         {
-            Plugin.Log?.LogError("[LobbyAutokickTweak] kick failed " + (ex == null ? "null" : ex.Message));
+            Plugin.Log?.LogError("LobbyAutokickTweak: kick failed " + (ex == null ? "null" : ex.Message));
         }
 
         private static FGClient.UI.PrivateLobby.PrivateLobbyScreenViewModel FindPrivatelobbyVm()

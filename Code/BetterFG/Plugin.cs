@@ -1,4 +1,4 @@
-using BepInEx;
+﻿using BepInEx;
 using BepInEx.Logging;
 using BepInEx.Unity.IL2CPP;
 using BetterFG.Core;
@@ -39,7 +39,7 @@ namespace BetterFG
             AppDomain.CurrentDomain.AssemblyResolve += ResolveNAudio;
 
             Log = base.Log;
-            Log.LogInfo($"{bettrfgstuff.DisplayName} {BetterFGInfo.Version} [{BetterFGInfo.BuildHash}] loaded");
+            Log.LogInfo($"{BettrFGMeta.DisplayName} {BetterFGInfo.Version} [{BetterFGInfo.BuildHash}] loaded");
 
             SettingsService.Init();
             BetterFGConfig.Init();
@@ -63,7 +63,7 @@ namespace BetterFG
             foreach (var type in Assembly.GetExecutingAssembly().GetTypes())
             {
                 try { new HarmonyLib.PatchClassProcessor(harmony, type).Patch(); }
-                catch (Exception ex) { Log.LogError($"[Harmony] Failed to patch {type.FullName}: {ex.Message}"); }
+                catch (Exception ex) { Log.LogError($"Harmony: Failed to patch {type.FullName}: {ex.Message}"); }
             }
 
             // FallGuysLib owns the shared game-state patch and re-raises it; we subscribe instead of
@@ -127,11 +127,11 @@ namespace BetterFG
             ClassInjector.RegisterTypeInIl2Cpp<ControllerManager>();
             ClassInjector.RegisterTypeInIl2Cpp<TabHoverTint>();
             ClassInjector.RegisterTypeInIl2Cpp<Tooltip>();
-            ClassInjector.RegisterTypeInIl2Cpp<tooltipTrigger>();
+            ClassInjector.RegisterTypeInIl2Cpp<TooltipTrigger>();
             ClassInjector.RegisterTypeInIl2Cpp<GradientImage>();
-            ClassInjector.RegisterTypeInIl2Cpp<move_pulseContinuousMove>();
-            ClassInjector.RegisterTypeInIl2Cpp<alpha_pulseContinuousFade>();
-            ClassInjector.RegisterTypeInIl2Cpp<move_scrollUvRaw>();
+            ClassInjector.RegisterTypeInIl2Cpp<MovePulseContinuous>();
+            ClassInjector.RegisterTypeInIl2Cpp<AlphaPulseContinuousFade>();
+            ClassInjector.RegisterTypeInIl2Cpp<MoveScrollUvRaw>();
             ClassInjector.RegisterTypeInIl2Cpp<DragHandler>();
             ClassInjector.RegisterTypeInIl2Cpp<LinkHover>();
             ClassInjector.RegisterTypeInIl2Cpp<SideWheelManager>();
@@ -148,7 +148,7 @@ namespace BetterFG
             ClassInjector.RegisterTypeInIl2Cpp<NametagTab>();
             ClassInjector.RegisterTypeInIl2Cpp<UITab>();
             ClassInjector.RegisterTypeInIl2Cpp<EmoticonsPhrasesTab>();
-            ClassInjector.RegisterTypeInIl2Cpp<featuresTab>();
+            ClassInjector.RegisterTypeInIl2Cpp<FeaturesTab>();
             ClassInjector.RegisterTypeInIl2Cpp<CustomSkinTextureTab>();
             ClassInjector.RegisterTypeInIl2Cpp<AllCosmeticsTab>();
             ClassInjector.RegisterTypeInIl2Cpp<CreativeTab>();
@@ -187,7 +187,7 @@ namespace BetterFG
             ClassInjector.RegisterTypeInIl2Cpp<ChangeSplashScreenTweak>();
             ClassInjector.RegisterTypeInIl2Cpp<HideCreatorCodeTweak>();
             ClassInjector.RegisterTypeInIl2Cpp<LobbyAutokickTweak>();
-            ClassInjector.RegisterTypeInIl2Cpp<spectatorMusicTweak>();
+            ClassInjector.RegisterTypeInIl2Cpp<SpectatorMusicTweak>();
             ClassInjector.RegisterTypeInIl2Cpp<MuteSocialSoundsTweak>();
             ClassInjector.RegisterTypeInIl2Cpp<BringBackFallGuyNoisesTweak>();
             ClassInjector.RegisterTypeInIl2Cpp<StripSizeTagsTweak>();
@@ -228,8 +228,7 @@ namespace BetterFG
             Spawn<BetterFG.Features.UnityRound.Editor.CreativeRoundMemory>("BetterFG_CreativeRoundMemory", persist: true);
             Spawn<BetterFG.UI.Windows.Creative.CreativeSelectionWatcher>("BetterFG_CreativeSelectionWatcher", persist: true);
 
-            var beanMonitor = Spawn<BeanMonitorService>("BetterFG_BeanMonitor", persist: false);
-            beanMonitor.OnBeanLog += msg => Log.LogInfo("[BeanMonitor] " + msg);
+            Spawn<BeanMonitorService>("BetterFG_BeanMonitor", persist: false);
 
             //Spawn<BetterFG.Features.WinStreakDebug.WinStreakDebugService>("BetterFG_WinStreakDebug", persist: true);
 
@@ -274,7 +273,7 @@ namespace BetterFG
             BetterFGTabRegistry.Register("UI", () => MakeTabGo<UITab>("BetterFG_UITab"));
             BetterFGTabRegistry.Register("Nametag", () => MakeTabGo<NametagTab>("BetterFG_NametagTab"));
             BetterFGTabRegistry.Register("Phrases", () => MakeTabGo<EmoticonsPhrasesTab>("BetterFG_EPTab"), "Social");
-            BetterFGTabRegistry.Register("Features", () => MakeTabGo<featuresTab>("BetterFG_FeaturesTab"));
+            BetterFGTabRegistry.Register("Features", () => MakeTabGo<FeaturesTab>("BetterFG_FeaturesTab"));
             BetterFGTabRegistry.Register("Skin Texture", () => MakeTabGo<CustomSkinTextureTab>("BetterFG_SkinTexTab"));
             BetterFGTabRegistry.Register("All Cosmetics", () => MakeTabGo<AllCosmeticsTab>("BetterFG_AllCosmeticsTab"));
             BetterFGTabRegistry.Register("Creative", () => MakeTabGo<CreativeTab>("BetterFG_CreativeTab"));

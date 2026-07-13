@@ -256,7 +256,7 @@ namespace BetterFG.UI
                 tex.wrapMode = TextureWrapMode.Clamp;
                 cache = tex;
             }
-            catch (Exception ex) { Debug.LogError($"[InfoWindow] {name}: {ex.Message}"); }
+            catch (Exception ex) { Plugin.Log.LogError($"InfoWindow: {name}: {ex.Message}"); }
             return cache;
         }
 
