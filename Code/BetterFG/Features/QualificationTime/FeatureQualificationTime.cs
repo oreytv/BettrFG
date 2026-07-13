@@ -1240,10 +1240,7 @@ namespace BetterFG.Features.QualificationTime
             var types = GhostTypesToSpawn(cacheId);
             if (types.Count == 0) { Plugin.Log.LogInfo("Ghost: nothing to spawn for mode " + GhostMode); yield break; }
 
-            string customName = LocalPlayerInfo.CustomName;
-            string playerName = string.IsNullOrEmpty(customName)
-                ? (GlobalGameStateClient.Instance?.GetLocalPlayerName() ?? "Ghost")
-                : customName;
+            string playerName = string.IsNullOrEmpty(LocalPlayerInfo.DisplayName) ? "Ghost" : LocalPlayerInfo.DisplayName;
 
             // only tag the ghost with its show name when more than one show could be on screen, or
             // when the user explicitly picked a single show. for plain "fastest" with one ghost we
@@ -1257,16 +1254,12 @@ namespace BetterFG.Features.QualificationTime
                 if (frames == null || frames.Count == 0) continue;
 
                 string ghostName = playerName + " (PB - " + ShowLabel(type) + ")";
-                var ghost = SpawnBeanUtils.SpawnBean(ghostName, new NPCCustomization("", ""));
+                var ghost = SpawnBeanUtils.SpawnBean(ghostName, new NPCCustomization("", "", null, null, -1));
                 Plugin.Log.LogInfo($"Ghost: SpawnBean result={ghost != null} [{type}]");
                 if (ghost == null) continue;
 
                 var ghostGo = ghost.gameObject;
-                // SpawnBean copies our appearance including our sized-up root scale. our own
-                // scale then rides a BetterFG_ScaleWrapper on the Character, so a leftover root
-                // scale multiplies it — a maxed 1.5x player showed up as 1.5x of 1.5x. reset the
-                // root to 1 and let the wrapper be the only thing carrying scale.
-                ghostGo.transform.localScale = Vector3.one;
+
                 if (ghost._rigidbody != null)
                 {
                     ghost._rigidbody.isKinematic = true;
@@ -1281,6 +1274,7 @@ namespace BetterFG.Features.QualificationTime
                 UnityEngine.Object.Destroy(ghost);
 
                 BetterFGUIMan.Instance.StartCoroutine(ApplyGhostSkinThenMatCoroutine(ghostGo, gen).WrapToIl2Cpp());
+                RegisterGhostNametag(ghostName);
                 _ghostGos.Add(ghostGo);
                 // snapshot the ghost's PB NOW — if the local player beats it this run, PBStore gets
                 // overwritten with the faster new time before the ghost finishes, and reading it at
@@ -1289,6 +1283,31 @@ namespace BetterFG.Features.QualificationTime
                 BetterFGUIMan.Instance.StartCoroutine(GhostPlayback(ghostGo, ghostAnim, frames, ghostName, ghostPb).WrapToIl2Cpp());
                 Plugin.Log.LogInfo($"Ghost: spawned for {cacheId} [{type}]");
             }
+        }
+
+        static void RegisterGhostNametag(string ghostName)
+        {
+            if (SettingsService.Get("nametag.enabled", "false") != "true") return;
+
+            var ci = System.Globalization.CultureInfo.InvariantCulture;
+            float F(string k, float d) => float.TryParse(SettingsService.Get(k, ""), System.Globalization.NumberStyles.Float, ci, out float v) ? v : d;
+            var profile = new BetterFG.Network.PlayerRemoteProfile
+            {
+                nametag = new BetterFG.Network.RemoteNametagInfo
+                {
+                    r = F("nametag.color.r", 1f), g = F("nametag.color.g", 1f), b = F("nametag.color.b", 1f),
+                    bold = SettingsService.Get("nametag.bold", "false") == "true",
+                    italic = SettingsService.Get("nametag.italic", "false") == "true",
+                    nameStyle = SettingsService.Get("nametag.namestyle", "default"),
+                    iconMode = SettingsService.Get("nametag.icon.mode", "none"),
+                    iconCountry = SettingsService.Get("nametag.icon.country", ""),
+                    iconPath = SettingsService.Get("nametag.icon.path", ""),
+                    iconScale = F("nametag.icon.scale", 1f),
+                    iconOffX = F("nametag.icon.offset.x", 0f),
+                    iconOffY = F("nametag.icon.offset.y", 0f),
+                },
+            };
+            BetterFG.Network.RemoteProfileStore.Register(profile, ghostName);
         }
 
         static IEnumerator ApplyGhostSkinThenMatCoroutine(GameObject ghostGo, int gen)
