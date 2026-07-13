@@ -1348,6 +1348,7 @@ namespace BetterFG.Features.QualificationTime
         {
             int idx = 0;
             bool finished = false;
+            int lastState = 0;
             while (ghostGo != null && _ghostGos.Contains(ghostGo) && idx < frames.Count)
             {
                 float elapsed = GlobalGameStateClient.Instance?.GameStateView != null
@@ -1370,7 +1371,38 @@ namespace BetterFG.Features.QualificationTime
                     if (elapsed >= frames[idx].t) { finished = true; break; }
                 }
                 if (ghostAnim != null)
-                    ghostAnim.Play(frames[idx].stateHash, 0, frames[idx].animTime);
+                {
+                    // only when the RECORDING changes state. comparing against the animator's actual state
+                    // instead meant every transition it made on its own counted as a mismatch, so we yanked
+                    // it back and restarted the clip every few frames through a slide
+                    if (frames[idx].stateHash != lastState)
+                    {
+                        lastState = frames[idx].stateHash;
+                        ghostAnim.Play(lastState, 0, 0f);
+                    }
+
+                    float r = FallGuysCharacterController.GroundCheckSphereCastRadius;
+                    bool grounded = Physics.SphereCast(ghostGo.transform.position + Vector3.up * (r + 0.1f),
+                        r, Vector3.down, out var hit, 0.4f,
+                        FallGuysCharacterController.groundMask, QueryTriggerInteraction.Ignore);
+                    ghostAnim.SetBool(FallGuysCharacterController.groundedParam, grounded);
+                    ghostAnim.SetFloat(FallGuysCharacterController.slopeAngleParam,
+                        grounded ? Vector3.Angle(hit.normal, Vector3.up) : 0f);
+
+                    // GameplayTimeElapsed is replicated, so neighbouring frames share a timestamp often
+                    // enough that a dt=0 zero velocity would snap the ghost to idle mid-stride
+                    float dt = idx + 1 < frames.Count ? frames[idx + 1].t - frames[idx].t : 0f;
+                    if (dt > 0f)
+                    {
+                        Vector3 v = (frames[idx + 1].pos - frames[idx].pos) / dt;
+                        Vector3 local = Quaternion.Inverse(frames[idx].rot) * new Vector3(v.x, 0f, v.z);
+                        float mod = FallGuysCharacterController.AnimationVelocityParamModifier;
+                        ghostAnim.SetFloat(FallGuysCharacterController.zVelParam, local.z * mod);
+                        ghostAnim.SetFloat(FallGuysCharacterController.xVelParam, local.x * mod);
+                        ghostAnim.SetFloat(FallGuysCharacterController.yVelParam, v.y * mod);
+                        ghostAnim.SetFloat(FallGuysCharacterController.airOnlyYVelParam, grounded ? 0f : v.y * mod);
+                    }
+                }
                 yield return null;
             }
             // ghost crossed the line — stamp the fallfeed with the PB snapshotted at spawn time.
