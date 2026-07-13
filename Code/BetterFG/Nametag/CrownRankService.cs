@@ -11,7 +11,8 @@ namespace BetterFG.Nametag
 {
     // In-game crown rank badge on the local player's nametag (PlayerInfoDisplayGameObject.
     // _crownRankBadgeViewModel). Local player only. Two things:
-    //   1. force the crown rank number + rank text on your own badge
+    //   1. override the crown rank text on your own badge (only when the game is showing it — the game's
+    //      own crown rank display option decides visibility, never us)
     //   2. recolour the badge sprites (Container/FlareBG glow + Container/Crown) to custom colours
     //
     // We don't patch anything — the badge VM's SetCrownRank(int) is callable directly, so we just drive
@@ -78,7 +79,7 @@ namespace BetterFG.Nametag
         // any mutation). respawn spawns a brand-new badge instance, so this is keyed by instance id — a fresh
         // badge we haven't touched is already pristine and reverting on it is a correct no-op. we restore
         // from this on toggle-off instead of leaving our overrides baked in.
-        class BadgePristine { public int rank; public bool active; public string text; public Sprite flare, crown; public Material tmpMat; public bool ignoreLayout, csfOn; public Vector3 pos; }
+        class BadgePristine { public int rank; public string text; public Sprite flare, crown; public Material tmpMat; public bool ignoreLayout, csfOn; public Vector3 pos; }
         static readonly Dictionary<int, BadgePristine> _pristine = new Dictionary<int, BadgePristine>();
 
         // drive the local player's in-game crown rank badge. resolves the local PlayerInfoDisplay via the
@@ -167,23 +168,13 @@ namespace BetterFG.Nametag
             if (!haveSnap)
                 _pristine[id] = snap = SnapshotBadge(badge, root);
 
-            // custom text on → stamp our text and force the badge visible even at real crown rank 0 (the game
-            // hides it otherwise). off → leave the badge's LIVE rank/active/text exactly as the game set it. do
-            // NOT stamp the snapshot back: behind the loading screen the badge exists but isn't populated yet, so
-            // the snapshot is empty (rank 0, inactive) and stamping it wiped the crown while recolour still ran.
+            // custom text on → stamp our text onto the badge. visibility is the game's call, always — its own
+            // crown rank display option ("hide mine") and rank-0 hiding decide whether the badge shows, we
+            // never force it. off → leave the badge's LIVE rank/active/text exactly as the game set it (do NOT
+            // stamp the snapshot back: behind the loading screen the badge isn't populated yet, so the empty
+            // snapshot wiped the crown while recolour still ran)
             if (cfg.textOn && !string.IsNullOrEmpty(cfg.text))
-            {
-                badge.CrownRankActive = true;
                 badge.CrownRankText = cfg.text;
-                // the game's own CrownRankBadgeViewModel keeps re-running UpdateActiveState off the real rank
-                // (0 for us), which flips CrownRankActive straight back to hidden — that's the fight that kept
-                // the custom badge invisible until the round settled. kill the component so it stops resetting us.
-                badge.enabled = false;
-            }
-            else
-            {
-                badge.enabled = true;
-            }
 
             if (cfg.recolourOn)
             {
@@ -333,7 +324,7 @@ namespace BetterFG.Nametag
 
         static BadgePristine SnapshotBadge(CrownRankBadgeViewModel badge, Transform root)
         {
-            var snap = new BadgePristine { rank = badge._currentCrownRank, active = badge.CrownRankActive, text = badge.CrownRankText };
+            var snap = new BadgePristine { rank = badge._currentCrownRank, text = badge.CrownRankText };
             var flare = root.Find("Container/FlareBG");
             var crown = root.Find("Container/Crown");
             snap.flare = flare != null ? SpriteOf(flare) : null;
@@ -350,10 +341,7 @@ namespace BetterFG.Nametag
 
         static void RevertBadge(CrownRankBadgeViewModel badge, Transform root, BadgePristine snap)
         {
-            // re-enable the VM we may have disabled to force custom text, then hand its values back
-            badge.enabled = true;
             badge.SetCrownRank(snap.rank);
-            badge.CrownRankActive = snap.active;
             badge.CrownRankText = snap.text;
 
             var flare = root.Find("Container/FlareBG");

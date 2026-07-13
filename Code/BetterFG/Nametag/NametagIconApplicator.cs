@@ -49,7 +49,6 @@ namespace BetterFG.Nametag
 
         private const string FLAG_OBJECT_NAME = "BetterFG_NametagIcon";
         private const string UI_ICON_NAME = "BetterFG_UINametagIcon";
-        private const string CROWN_RANK_NAME = "Generic_UI_CrownRankCounter_3D_Prefab";
         private const float BASE_SCALE = 0.3f;
         private const float FLAG_NUDGE_X = 0.01f;
         private const float UI_ICON_SIZE_REGULAR = 2f * 0.37f * 0.18f;
@@ -1453,6 +1452,13 @@ namespace BetterFG.Nametag
                 layoutImg.color = new Color(1f, 1f, 1f, tmp.color.a);
                 _iconUI[tmp.GetInstanceID()] = layoutImg;
                 MaybeAttachGifAnimator(iconGo, null, layoutImg, iconMode, iconPath);
+                // canvas tags hide a no-rank crown by disabling its Container while the badge root stays an
+                // active layout child, so the rebuild would still reserve its width. mirror the hide into
+                // ignoreLayout (both ways, so a crown gained later takes its space back)
+                var crownVm = parent.GetComponentInChildren<CrownRankBadgeViewModel>(true);
+                var crownCont = crownVm != null ? crownVm.transform.Find("Container") : null;
+                var crownLe = crownVm != null ? crownVm.GetComponent<LayoutElement>() : null;
+                if (crownCont != null && crownLe != null) crownLe.ignoreLayout = !crownCont.gameObject.activeSelf;
                 LayoutRebuilder.ForceRebuildLayoutImmediate(parent.GetComponent<RectTransform>());
                 var layoutHost = BeanMonitorService.Instance;
                 if (layoutHost != null)
@@ -1544,8 +1550,11 @@ namespace BetterFG.Nametag
 
         private static float GetCrownWorldWidth(Transform nameAndCrown)
         {
-            var crown = nameAndCrown.Find(CROWN_RANK_NAME);
+            var crown = nameAndCrown.GetComponentInChildren<CrownRankBadgeViewModel>(true)?.transform;
             if (crown == null) return 0f;
+            // a badge that's actually part of the tag sits at local y 0. with no crown rank the game parks
+            // it off the tag (y != 0) while it's still active, so don't reserve layout space for it
+            if (Mathf.Abs(crown.localPosition.y) > 0.0001f) return 0f;
             var container = crown.Find("Container");
             if (container == null || !container.gameObject.activeInHierarchy) return 0f;
             var rt = crown.GetComponent<RectTransform>();
@@ -1656,7 +1665,7 @@ namespace BetterFG.Nametag
 
                 if (resolvedCrownW > 0f)
                 {
-                    var crown = nameAndCrown.Find(CROWN_RANK_NAME);
+                    var crown = nameAndCrown.GetComponentInChildren<CrownRankBadgeViewModel>(true)?.transform;
                     if (crown != null)
                         crown.localPosition = new Vector3(crownX, crown.localPosition.y, crown.localPosition.z);
                 }
@@ -1672,7 +1681,7 @@ namespace BetterFG.Nametag
         {
             var nameAndCrown = NametagFinder.FindNameAndCrownParent();
             if (nameAndCrown == null) return;
-            var crown = nameAndCrown.Find(CROWN_RANK_NAME);
+            var crown = nameAndCrown.GetComponentInChildren<CrownRankBadgeViewModel>(true)?.transform;
             if (crown == null) return;
 
             var le = crown.GetComponent<LayoutElement>();
