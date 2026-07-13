@@ -60,13 +60,6 @@ namespace BetterFG.Customization.Player
         private void RemoveGameCosmeticById(string id)
         {
             if (string.IsNullOrEmpty(id)) return;
-            CostumeOption removedOption = null;
-            foreach (var slot in activeGameCosmetics)
-            {
-                if (slot == null || slot.id != id) continue;
-                removedOption = slot.option;
-                break;
-            }
             activeGameCosmetics.RemoveAll(s => s == null || s.id == id);
 
             var localBean = BeanMonitorService.LocalPlayerBean;
@@ -96,7 +89,7 @@ namespace BetterFG.Customization.Player
             foreach (var k in toKill) { appliedSkins.Remove(k); pendingKeys.Remove(k); }
 
             foreach (var bean in affectedBeans)
-                StartCoroutine(ReapplyGameCosmeticMasksCoroutine(bean, removedOption).WrapToIl2Cpp());
+                RestampBeanMasks(bean);
         }
 
         // Applies the currently active game (unlocked) cosmetics, colour and pattern to one specific bean.
@@ -237,7 +230,9 @@ namespace BetterFG.Customization.Player
                 if (!boundRenderers.Contains(go)) boundRenderers.Add(go);
             }
 
-            yield return ApplyGameCosmeticMaskCoroutine(slot.option, bean).WrapToIl2Cpp();
+            // warm the cache with this cosmetic's mask, then stamp both slots from current state
+            yield return LoadCostumeMaskCoroutine(slot.option, "mask", r => { }).WrapToIl2Cpp();
+            RestampBeanMasks(bean);
             ApplyGameColourPatternToBean(bean);
 
             KillExistingAppliedAtKey(pendingKey);
@@ -309,74 +304,66 @@ namespace BetterFG.Customization.Player
             return boundGos;
         }
 
-        private IEnumerator ApplyGameCosmeticMaskCoroutine(CostumeOption option, GameObject bean)
+        // the bean's body mask is two shader slots, top and bottom (SetMask picks the slot from the
+        // option's CostumeType). a slot's mask is the union of every worn item's mask on that slot —
+        // real equipped costume plus active cosmetics — and removal is just recomputing without the
+        // removed one. synchronous on purpose: this used to be a coroutine, and a slow one started
+        // before a remove would finish after it and stamp the old carve back. by restamp time every
+        // mask is already in gameCosmeticMaskCache (the apply path loads it), so there's nothing to
+        // wait for. _noCostumeMask is the game's carve-nothing texture, the safe empty-slot value.
+        private void RestampBeanMasks(GameObject bean)
         {
-            if (option == null || bean == null) yield break;
-
+            if (bean == null) return;
             var fgch = bean.GetComponent<FallguyCustomisationHandler>();
-            if (fgch == null) yield break;
+            if (fgch == null) return;
 
-            // load this cosmetic's mask
-            Texture mask = null;
-            bool loaded = false;
-            yield return LoadCostumeMaskCoroutine(option, "cosm", r => { mask = r; loaded = true; }).WrapToIl2Cpp();
-            if (!loaded || mask == null)
+            CostumeOption topRoute = null, bottomRoute = null;
+            var top = new List<Texture>();
+            var bottom = new List<Texture>();
+
+            foreach (var option in GetWornCostumeOptionsForBean(bean))
             {
-                Plugin.Log.LogWarning($"no costume mask for {GetGameCosmeticName(option)}");
-                yield break;
+                CostumeType type;
+                try { type = option.CostumeType; } catch { continue; }
+                Texture m = null;
+                try { m = option.CostumeMask; } catch { }
+                if (m == null) gameCosmeticMaskCache.TryGetValue(GetCostumeMaskKey(option), out m);
+                if (type != CostumeType.Bottom) { topRoute ??= option; if (m != null) top.Add(m); }
+                if (type != CostumeType.Top) { bottomRoute ??= option; if (m != null) bottom.Add(m); }
             }
 
-            // collect real costume masks (top + bottom) so we can union them with ours —
-            // SetMask replaces per slot so we must composite all the masks into one texture.
-            // for a remote PROFILE bean use ITS costume options (recorded when the profile applied),
-            // not GlobalGameStateClient which is always the local player.
-            var realOpts = GetRealCostumeOptionsForBean(bean);
-
-            var maskList = new List<Texture> { mask };
-            foreach (var ro in realOpts)
-            {
-                if (ro == null) continue;
-                Texture rm = null;
-                bool rl = false;
-                yield return LoadCostumeMaskCoroutine(ro, "real", r => { rm = r; rl = true; }).WrapToIl2Cpp();
-                if (rl && rm != null) maskList.Add(rm);
-            }
-
-            Texture finalMask = maskList.Count == 1 ? mask : CompositeMasks(maskList);
-
-            try
-            {
-                fgch.SetMask(option, finalMask);
-            }
-            catch (Exception ex)
-            {
-                Plugin.Log.LogWarning($"SetMask failed: {ex.Message}");
-            }
+            StampSlot(fgch, topRoute, top);
+            StampSlot(fgch, bottomRoute, bottom);
         }
 
-        // which top/bottom costume options to union a cosmetic mask against for this bean. remote
-        // profile beans use the costumes that profile applied; everyone else falls back to the local
-        // player's selections (correct for the local bean).
-        private List<CostumeOption> GetRealCostumeOptionsForBean(GameObject bean)
+        private void StampSlot(FallguyCustomisationHandler fgch, CostumeOption route, List<Texture> masks)
+        {
+            if (route == null) return;
+            Texture tex = masks.Count == 0 ? fgch._noCostumeMask : masks.Count == 1 ? masks[0] : CompositeMasks(masks);
+            if (tex == null) return;
+            try { fgch.SetMask(route, tex); }
+            catch (Exception ex) { Plugin.Log.LogWarning($"SetMask failed: {ex.Message}"); }
+        }
+
+        // every costume option currently worn on this bean: the real equipped top/bottom plus every
+        // active all-cosmetics cosmetic. remote PROFILE beans use the costumes that profile applied
+        // (recorded on apply); everyone else falls back to the local player's selections.
+        private List<CostumeOption> GetWornCostumeOptionsForBean(GameObject bean)
         {
             var result = new List<CostumeOption>();
             if (bean != null && profileBeanCostumes.TryGetValue(bean.GetInstanceID(), out var profileCostumes) && profileCostumes != null)
             {
                 foreach (var c in profileCostumes) if (c != null) result.Add(c);
-                return result;
             }
-
-            var sel = GlobalGameStateClient.Instance?.PlayerProfile?.CustomisationSelections;
-            if (sel != null)
+            else
             {
-                if (sel.CostumeTopOption != null) result.Add(sel.CostumeTopOption);
-                if (sel.CostumeBottomOption != null) result.Add(sel.CostumeBottomOption);
+                var sel = GlobalGameStateClient.Instance?.PlayerProfile?.CustomisationSelections;
+                if (sel != null)
+                {
+                    if (sel.CostumeTopOption != null) result.Add(sel.CostumeTopOption);
+                    if (sel.CostumeBottomOption != null) result.Add(sel.CostumeBottomOption);
+                }
             }
-            // ALSO union every active all-cosmetics cosmetic, not just the equipped top/bottom. with
-            // multiple cosmetics on, each one's mask must hide the base body under ALL of them — not
-            // only under itself + the real costume — otherwise the body pokes through wherever another
-            // cosmetic sits. dupes (incl. the cosmetic currently being applied) are harmless: the
-            // composite takes a channel-wise max so adding the same mask twice changes nothing.
             foreach (var slot in activeGameCosmetics)
                 if (slot?.option != null) result.Add(slot.option);
             return result;
@@ -557,32 +544,18 @@ namespace BetterFG.Customization.Player
             return GetGameCosmeticOptionId(option) + "|mask";
         }
 
-        private IEnumerator ReapplyGameCosmeticMasksCoroutine(GameObject bean, CostumeOption clearOption)
+        private IEnumerator ReapplyGameCosmeticMasksCoroutine(GameObject bean)
         {
             if (bean == null) yield break;
-            var fgch = bean.GetComponent<FallguyCustomisationHandler>();
-            if (fgch == null) yield break;
+            if (bean.GetComponent<FallguyCustomisationHandler>() == null) yield break;
 
-            if (clearOption != null)
-            {
-                try
-                {
-                    var blank = fgch._noCostumeMask;
-                    if (blank != null)
-                    {
-                        fgch.SetMask(clearOption, blank);
-                    }
-                }
-                catch (Exception ex) { Plugin.Log.LogWarning($"clear mask failed: {ex.Message}"); }
-            }
-
+            // any cosmetic whose mesh instance went missing carves nothing on its own — reapply the
+            // full cosmetic (mesh + mask). ApplyGameCosmeticToBeanCoroutine restamps masks itself.
+            bool reapplied = false;
             for (int i = 0; i < activeGameCosmetics.Count; i++)
             {
                 var slot = activeGameCosmetics[i];
-                if (slot == null || slot.option == null) continue;
-
-                // if the mesh instance is missing on this bean, the mask alone would carve holes
-                // with nothing filling them. reapply the full cosmetic (mesh + mask) instead.
+                if (slot?.option == null) continue;
                 string key = MakeKey(bean, slot.id);
                 bool meshPresent = appliedSkins.TryGetValue(key, out var entry) && entry?.instance != null;
                 if (!meshPresent && !pendingKeys.Contains(key))
@@ -590,11 +563,11 @@ namespace BetterFG.Customization.Player
                     appliedSkins.Remove(key);
                     pendingKeys.Add(key);
                     yield return ApplyGameCosmeticToBeanCoroutine(slot, bean, ApplyReason.FromMenu).WrapToIl2Cpp();
-                    continue;
+                    reapplied = true;
                 }
-
-                yield return ApplyGameCosmeticMaskCoroutine(slot.option, bean).WrapToIl2Cpp();
             }
+
+            if (!reapplied) RestampBeanMasks(bean);
         }
 
         private void ApplyGameColourPatternToAllBeans()

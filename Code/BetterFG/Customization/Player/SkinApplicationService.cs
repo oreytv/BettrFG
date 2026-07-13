@@ -1116,7 +1116,7 @@ namespace BetterFG.Customization.Player
 
             if (bean != null)
             {
-                StartCoroutine(ReapplyGameCosmeticMasksCoroutine(bean, null).WrapToIl2Cpp());
+                StartCoroutine(ReapplyGameCosmeticMasksCoroutine(bean).WrapToIl2Cpp());
                 return;
             }
 
@@ -1125,24 +1125,30 @@ namespace BetterFG.Customization.Player
             {
                 var b = beans[i];
                 if (b == null || SkipMenuSkinAutoApplyForThisBean(b)) continue;
-                StartCoroutine(ReapplyGameCosmeticMasksCoroutine(b, null).WrapToIl2Cpp());
+                StartCoroutine(ReapplyGameCosmeticMasksCoroutine(b).WrapToIl2Cpp());
             }
         }
 
         public void ReapplyExpectedGameCosmeticVisuals(GameObject bean = null)
         {
             ReapplyExpectedGameCosmeticMasks(bean);
-            if (!activeColour.On && !activePattern.On) return;
-            if (bean != null)
+            // custom skin textures reapply regardless — the colour/pattern gate used to sit above
+            // this and silently skipped textures for anyone running a texture with no colour/pattern
+            // (view switches dropped the texture and it never came back)
+            if (activeColour.On || activePattern.On)
             {
-                if (!SkipMenuSkinAutoApplyForThisBean(bean)) ApplyGameColourPatternToBean(bean);
-                CustomSkinTextureTab.ReapplyAllEnabledFromSettings();
-                return;
+                if (bean != null)
+                {
+                    if (!SkipMenuSkinAutoApplyForThisBean(bean)) ApplyGameColourPatternToBean(bean);
+                }
+                else
+                {
+                    var beans = BeanMonitorService.GetTrackedBeans();
+                    for (int i = 0; i < beans.Count; i++)
+                        if (beans[i] != null && !SkipMenuSkinAutoApplyForThisBean(beans[i]))
+                            ApplyGameColourPatternToBean(beans[i]);
+                }
             }
-            var beans = BeanMonitorService.GetTrackedBeans();
-            for (int i = 0; i < beans.Count; i++)
-                if (beans[i] != null && !SkipMenuSkinAutoApplyForThisBean(beans[i]))
-                    ApplyGameColourPatternToBean(beans[i]);
             CustomSkinTextureTab.ReapplyAllEnabledFromSettings();
         }
 
