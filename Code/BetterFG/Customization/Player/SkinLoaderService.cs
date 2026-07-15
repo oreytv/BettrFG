@@ -207,7 +207,37 @@ namespace BetterFG.Customization.Player
         public IEnumerator ResolveProfileSlot(RemoteSkinEntry entry, Action<ActiveSkinSlot> done)
         {
             SkinType type = SkinTypeParser.FromString(entry.type);
-            if (type == SkinType.Unknown) yield break;
+            // plinths never bind to a bean (the profile plinth has its own path) — resolving one
+            // here builds a Costumes/ url that 404s and eats the whole 20s timeout, stalling every
+            // skin/cosmetic/texture queued behind it
+            if (type == SkinType.Unknown || type == SkinType.Plinth) yield break;
+
+            // embedded local skins already sit unpacked on disk — no repo has ever heard of them
+            if (entry.source == "local" && !string.IsNullOrEmpty(entry.localPath) && File.Exists(entry.localPath))
+            {
+                AssetBundle local = null;
+                if (skinApp != null && skinApp.TryGetLoadedBundle(entry.file, out var already) && already != null)
+                    local = already;
+                else
+                {
+                    byte[] bytes = null;
+                    try { bytes = File.ReadAllBytes(entry.localPath); }
+                    catch (Exception ex) { Plugin.Log.LogWarning($"local profile skin {entry.file}: {ex.Message}"); }
+                    if (bytes != null)
+                    {
+                        local = skinApp?.GetOrLoadBundle(entry.file, bytes);
+                        if (local != null) skinApp.RegisterRemoteBundle(entry.file, local);
+                    }
+                }
+                if (local != null)
+                    done(new ActiveSkinSlot
+                    {
+                        skinInfo = new SkinInfo { name = entry.file, file = entry.file, type = entry.type, isLocalImport = true, localPath = entry.localPath },
+                        bundle = local,
+                        type = type,
+                    });
+                yield break;
+            }
 
             string category = type == SkinType.Accessory ? "Accessories" : type == SkinType.Item ? "Items" : "Costumes";
             string repoRaw = RepoRegistry.ResolveRaw(entry.repoUrl);

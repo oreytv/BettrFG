@@ -126,6 +126,7 @@ namespace BetterFG.Features.UnityRound
                 Destroy(ActiveRound);
 
             ActiveRound = null;
+            Patches.BettrFGRounds.UnityRoundAbortHooks.Remove();
             ActiveMapInfo = null;
             ActiveSpawnpoints = null;
             ActiveEndgoals = null;
@@ -292,6 +293,7 @@ namespace BetterFG.Features.UnityRound
             SceneManager.MoveGameObjectToScene(instance, targetScene);
 
             ActiveRound = instance;
+            Patches.BettrFGRounds.UnityRoundAbortHooks.Install();
             _pendingPrefab = null;
 
             Plugin.Log.LogInfo($"BetterFGUnityRounds: instantiated '{instance.name}' into '{targetScene.name}'");

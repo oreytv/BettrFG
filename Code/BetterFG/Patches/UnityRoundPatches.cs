@@ -30,6 +30,7 @@ namespace BetterFG.Patches.BettrFGRounds
         public static void Prefix()
         {
             BetterFG.Features.UnityRound.RoundMusicService.Stop();
+            UnityRoundAbortHooks.Remove();
         }
 
         [HarmonyPostfix]
@@ -105,23 +106,30 @@ namespace BetterFG.Patches.BettrFGRounds
         }
     }
 
-    // gate these to a live unity round. off-round they were killing the game's own AbortGrab/
-    // AbortMantling globally, so a respawn that had to cancel an in-progress grab/mantle before
-    // teleporting never did -- the motor stayed stuck and the checkpoint teleport never applied.
-    // that's the "respawn runs but doesn't move you" bug, and it hit plain official rounds too.
-    // returning true lets the original run exactly like vanilla, which is what happens off-round.
-    [HarmonyPatch(typeof(MotorFunctionMantle), "AbortMantling")]
-    public class AbortMantlingPatch
+    // AbortGrab/AbortMantling are only patched while a unity round is live. a permanent prefix
+    // that returns true off-round recurses through il2cpp_runtime_invoke (the "original" call
+    // re-enters the detour) and stack-overflows the game, so instead the hooks are installed on
+    // round instantiate and removed on shutdown/reset, and the prefix always skips the original
+    internal static class UnityRoundAbortHooks
     {
-        [HarmonyPrefix]
-        public static bool Prefix() => !UnityRoundGate.RoundLive;
-    }
+        static Harmony _harmony;
 
-    [HarmonyPatch(typeof(MotorFunctionGrab), "AbortGrab")]
-    public class AbortGrabPatch
-    {
-        [HarmonyPrefix]
-        public static bool Prefix() => !UnityRoundGate.RoundLive;
+        public static bool SkipOriginal() => false;
+
+        public static void Install()
+        {
+            if (_harmony != null) return;
+            _harmony = new Harmony(MyPluginInfo.PLUGIN_GUID + ".unityround.abort");
+            var prefix = new HarmonyMethod(typeof(UnityRoundAbortHooks), nameof(SkipOriginal));
+            _harmony.Patch(AccessTools.Method(typeof(MotorFunctionGrab), "AbortGrab"), prefix: prefix);
+            _harmony.Patch(AccessTools.Method(typeof(MotorFunctionMantle), "AbortMantling"), prefix: prefix);
+        }
+
+        public static void Remove()
+        {
+            _harmony?.UnpatchSelf();
+            _harmony = null;
+        }
     }
 
     [HarmonyPatch(typeof(MotorFunctionGrab), "ShouldApplyStateSnapshot")]

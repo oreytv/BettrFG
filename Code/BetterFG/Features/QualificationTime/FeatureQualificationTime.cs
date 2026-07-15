@@ -45,6 +45,7 @@ namespace BetterFG.Features.QualificationTime
             new FeatureSetting { id = "play", label = "Show PB during play", defaultOn = true },
             new FeatureSetting { id = "timer", label = "Show live timer", defaultOn = true },
             new FeatureSetting { id = "menu", label = "Show PB button on menu", defaultOn = true },
+            new FeatureSetting { id = "favprompt", label = "Show favorite button on qual", defaultOn = true },
             new FeatureSetting { id = "asksave", label = "Ask to save PB", defaultOn = false },
             new FeatureSetting { id = "ghost", label = "Ghost run", defaultOn = true },
         },
@@ -367,7 +368,7 @@ namespace BetterFG.Features.QualificationTime
                 }
             }
 
-            var favPrompt = SpawnFavPrompt(rowGo.transform, roundId, roundName);
+            var favPrompt = On("favprompt") ? SpawnFavPrompt(rowGo.transform, roundId, roundName) : null;
 
             NavPromptHandle setPbPrompt = null;
             if (!isPb)

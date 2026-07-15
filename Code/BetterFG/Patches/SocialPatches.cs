@@ -46,7 +46,11 @@ namespace BetterFG.Patches.Social
             var speechBean = __instance.MotorAgent?.gameObject;
             uint localId = PlayerUtils.GetLocalPlayerId();
             bool localSpeech = speechBean != null && speechBean.name == "LevelEditor_FallGuy(Clone)";
-            if (!localSpeech && (localId == 0 || speechBean != PlayerUtils.GetPlayerObject(localId))) return true;
+            if (!localSpeech && (localId == 0 || speechBean != PlayerUtils.GetPlayerObject(localId)))
+            {
+                RemoteSocialDisplay.TryRemap(speechBean, ref optionId);
+                return true;
+            }
 
             if (PhraseInjectionService.Remap.TryGetValue(optionId, out int remappedPhrase))
             {

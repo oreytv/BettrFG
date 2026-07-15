@@ -345,24 +345,46 @@ namespace BetterFG.Customization.Player
             catch (Exception ex) { Plugin.Log.LogWarning($"SetMask failed: {ex.Message}"); }
         }
 
-        // every costume option currently worn on this bean: the real equipped top/bottom plus every
-        // active all-cosmetics cosmetic. remote PROFILE beans use the costumes that profile applied
-        // (recorded on apply); everyone else falls back to the local player's selections.
+        // every costume option currently worn on this bean. remote PROFILE beans use the costumes
+        // that profile applied (recorded on apply). other remote in-round beans use THEIR OWN
+        // selections off ClientPlayerManager metadata — never the local profile's, and never our
+        // activeGameCosmetics (both are local-player state; stamping their masks on a remote carves
+        // the wrong body parts). only the local/menu beans get local selections + cosmetics.
         private List<CostumeOption> GetWornCostumeOptionsForBean(GameObject bean)
         {
             var result = new List<CostumeOption>();
             if (bean != null && profileBeanCostumes.TryGetValue(bean.GetInstanceID(), out var profileCostumes) && profileCostumes != null)
             {
                 foreach (var c in profileCostumes) if (c != null) result.Add(c);
+                return result;
             }
-            else
+
+            if (IsRemoteInRoundBean(bean))
             {
-                var sel = GlobalGameStateClient.Instance?.PlayerProfile?.CustomisationSelections;
-                if (sel != null)
+                try
                 {
-                    if (sel.CostumeTopOption != null) result.Add(sel.CostumeTopOption);
-                    if (sel.CostumeBottomOption != null) result.Add(sel.CostumeBottomOption);
+                    var cpm = FallGuysLib.Players.PlayerUtils.GetClientPlayerManager();
+                    if (cpm?._playerIdIndex != null)
+                        foreach (var kvp in cpm._playerIdIndex)
+                        {
+                            if (kvp.Value?.fgcc?.gameObject != bean) continue;
+                            CustomisationSelections sel2 = null;
+                            if (cpm._playerMetadata != null && cpm._playerMetadata.ContainsKey(kvp.Key))
+                                sel2 = cpm._playerMetadata[kvp.Key]?.Selections;
+                            if (sel2?.CostumeTopOption != null) result.Add(sel2.CostumeTopOption);
+                            if (sel2?.CostumeBottomOption != null) result.Add(sel2.CostumeBottomOption);
+                            break;
+                        }
                 }
+                catch (Exception ex) { Plugin.Log.LogWarning($"remote selections lookup: {ex.Message}"); }
+                return result;
+            }
+
+            var sel = GlobalGameStateClient.Instance?.PlayerProfile?.CustomisationSelections;
+            if (sel != null)
+            {
+                if (sel.CostumeTopOption != null) result.Add(sel.CostumeTopOption);
+                if (sel.CostumeBottomOption != null) result.Add(sel.CostumeBottomOption);
             }
             foreach (var slot in activeGameCosmetics)
                 if (slot?.option != null) result.Add(slot.option);
