@@ -212,8 +212,10 @@ namespace BetterFG.Features.UnityRound
                              || n.IndexOf("spawnpoint", StringComparison.OrdinalIgnoreCase) >= 0;
                     if (keep) continue;
 
-                    // finish lines never switch off, you'd lose the end of the round. ghost them instead
-                    if (n.IndexOf("Floor", StringComparison.OrdinalIgnoreCase) >= 0
+                    // in the editor the finish line stays up so you can still see where the round ends,
+                    // just ghosted. a real round switches it off like everything else
+                    if (Editor.UnityRoundLoader.InLevelEditor
+                        && n.IndexOf("Floor", StringComparison.OrdinalIgnoreCase) >= 0
                         && n.IndexOf("End", StringComparison.OrdinalIgnoreCase) >= 0)
                     {
                         Ghost(root);
