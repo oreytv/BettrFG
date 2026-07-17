@@ -965,7 +965,15 @@ namespace BetterFG.UI
             var go = new GameObject("InputField");
             go.transform.SetParent(parent, false);
             SetPixelRect(go.AddComponent<RectTransform>(), rect);
-            go.AddComponent<Image>().color = bg;
+
+            var img = go.AddComponent<Image>();
+            img.color = bg;
+            var fieldSprite = GetButtonSprite();
+            if (fieldSprite != null)
+            {
+                img.sprite = fieldSprite;
+                img.type = Image.Type.Simple;
+            }
 
             var field = go.AddComponent<InputField>();
             var nav = field.navigation;
@@ -1101,42 +1109,73 @@ namespace BetterFG.UI
         }
 
         // �� Increment stepper ([-] value [+]) ��������������������������������
-        // one place for every -/value/+ control. lays out the two step buttons + value label inside
-        // `rect`, wired to get/set. wrap=true (default) loops min<->max on overflow (7 +1 -> 0), wrap=false
-        // clamps. `fmt` formats the value text (defaults to the raw int). onChange fires after set, for
-        // the caller to save/refresh. returns the value Text so callers can resync it if it changes elsewhere.
+        // one place for every -/value/+ control. lays out the two step buttons either side of the value
+        // inside `rect`, wired to get/set. wrap=true (default) loops min<->max on overflow (7 +1 -> 0),
+        // wrap=false clamps. isFloat keeps decimals, otherwise the value stays whole. `fmt` formats the
+        // value text. onChange fires after set, for the caller to save/refresh. the value sits in a real
+        // InputField, so a pad can hold +/- and a keyboard can type the extreme the steps won't reach.
+        // returns it so callers can resync if the value changes elsewhere.
         private static readonly Color IncStepCol = new Color(0.22f, 0.32f, 0.42f, 1f);
-        public static Text CreateIncrement(Transform parent, Rect rect, int min, int max,
-            Func<int> get, Action<int> set, bool wrap = true, int fontSize = 13,
-            Func<int, string> fmt = null, Action<int> onChange = null)
+        public static InputField CreateIncrement(Transform parent, Rect rect, float min, float max,
+            Func<float> get, Action<float> set, float step, bool isFloat = false, bool wrap = true,
+            int fontSize = 13, Func<float, string> fmt = null, Action<float> onChange = null)
         {
-            if (fmt == null) fmt = v => v.ToString();
+            var ci = System.Globalization.CultureInfo.InvariantCulture;
+            if (fmt == null) fmt = v => isFloat ? v.ToString(ci) : Mathf.RoundToInt(v).ToString(ci);
+
             float stepW = rect.height;                    // square step buttons
             float valW = rect.width - stepW * 2f;
 
-            var valLbl = CreateLabel(parent,
-                new Rect(rect.x + stepW, rect.y, valW, rect.height),
-                fmt(get()), fontSize, Color.white, TextAnchor.MiddleCenter);
+            var field = CreateInputField(parent, new Rect(rect.x + stepW, rect.y, valW, rect.height),
+                "", new Color(0.12f, 0.12f, 0.12f, 1f), Color.white, fontSize);
+            field.contentType = isFloat ? InputField.ContentType.DecimalNumber : InputField.ContentType.IntegerNumber;
+            field.textComponent.alignment = TextAnchor.MiddleCenter;
+            SetInputText(field, fmt(get()), false);
 
-            void Step(float x, int delta, string glyph)
+            void Commit(float v)
+            {
+                v = Mathf.Clamp(v, min, max);
+                if (!isFloat) v = Mathf.Round(v);
+                set(v);
+                SetInputText(field, fmt(v), false);
+                onChange?.Invoke(v);
+            }
+
+            field.onEndEdit.AddListener(new Action<string>(s =>
+            {
+                if (float.TryParse(s, System.Globalization.NumberStyles.Float, ci, out var typed)) Commit(typed);
+                else SetInputText(field, fmt(get()), false);
+            }));
+
+            void Step(float x, float delta, string glyph)
             {
                 CreateButton(parent, new Rect(x, rect.y, stepW, rect.height), glyph,
                     IncStepCol, Color.white, fontSize, new Action(() =>
                     {
-                        int span = max - min + 1;
-                        int nv = wrap && span > 0
-                            ? min + (((get() - min + delta) % span) + span) % span
-                            : Mathf.Clamp(get() + delta, min, max);
-                        set(nv);
-                        valLbl.text = fmt(nv);
-                        onChange?.Invoke(nv);
+                        // decimal, and anchored at 0 instead of min. float stepping drifts (0.1+0.05
+                        // = 0.15000001) and the field renders every digit of it; anchoring the grid
+                        // at a min of 0.01 walks you along 0.06/0.11/0.16 instead of round numbers
+                        decimal grid = (decimal)step;
+                        float nv = (float)(Math.Round(((decimal)get() + (decimal)delta) / grid) * grid);
+                        float span = max - min + (isFloat ? 0f : 1f);
+                        if (wrap && span > 0f) nv = min + Mathf.Repeat(nv - min, span);
+                        Commit(nv);
                     }));
             }
 
-            Step(rect.x, -1, "−");                    // minus sign, matches existing rows
-            Step(rect.x + stepW + valW, +1, "+");
-            return valLbl;
+            Step(rect.x, -step, "−");                    // minus sign, matches existing rows
+            Step(rect.x + stepW + valW, step, "+");
+            return field;
         }
+
+        // int flavour, the original shape — every existing caller still lands here
+        public static InputField CreateIncrement(Transform parent, Rect rect, int min, int max,
+            Func<int> get, Action<int> set, bool wrap = true, int fontSize = 13,
+            Func<int, string> fmt = null, Action<int> onChange = null)
+            => CreateIncrement(parent, rect, min, max, () => get(), v => set(Mathf.RoundToInt(v)),
+                1f, false, wrap, fontSize,
+                fmt == null ? null : new Func<float, string>(v => fmt(Mathf.RoundToInt(v))),
+                onChange == null ? null : new Action<float>(v => onChange(Mathf.RoundToInt(v))));
 
         // �� Dropdown ����������������������������������������������������������
         // shared dropdown control (the one the Font tab and Skin Texture tab use). pass options

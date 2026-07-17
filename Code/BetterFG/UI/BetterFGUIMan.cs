@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using BetterFG.Services;
+using BetterFG.Utilities;
 using BepInEx.Unity.IL2CPP.Utils.Collections;
 using UnityEngine;
 using BetterFG.UI.SideWheel;
@@ -421,7 +422,7 @@ namespace BetterFG.UI
         void Update()
         {
             WinDialogs.Tick();
-            FileDropService.Init(); // one-shot; self-guards once the game window exists
+            Shell32Util.Init(); // one-shot; self-guards once the game window exists
             UpdateInputNavState();
             FGInputLockService.Tick();
             MenuMusicService.TickVolume();

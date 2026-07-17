@@ -217,6 +217,7 @@ namespace BetterFG
             ClassInjector.RegisterTypeInIl2Cpp<LivelyFallGuysTweak>();
             ClassInjector.RegisterTypeInIl2Cpp<LevelDescriptionOnPauseTweak>();
             ClassInjector.RegisterTypeInIl2Cpp<CreativeTypeValueTweak>();
+            ClassInjector.RegisterTypeInIl2Cpp<NotifyRoundStartTweak>();
             //ClassInjector.RegisterTypeInIl2Cpp<BetterFG.Features.WinStreakDebug.WinStreakDebugService>();
         }
 

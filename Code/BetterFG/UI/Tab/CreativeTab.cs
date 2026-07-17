@@ -57,7 +57,6 @@ namespace BetterFG.UI.Tab
         private Text _shareStatus;
 
         // args panel
-        private InputField _incMinField, _incStepField, _incMaxField, _incSpeedField;
         private Button _incToggle, _batchToggle;
 
         // textures panel
@@ -425,8 +424,8 @@ namespace BetterFG.UI.Tab
                 }));
             cy += BTN_H + SH * 2f;
 
-            var ci = System.Globalization.CultureInfo.InvariantCulture;
             float thirdW = (w - PAD * 2f) / 3f;
+            float incH = BTN_H * 0.82f;
 
             // min / increment / max across
             UGUIShip.CreateLabel(root.transform, new Rect(PAD, cy, thirdW, rh), "Min", FS_SM, new Color(1f, 1f, 1f, 0.72f));
@@ -434,47 +433,25 @@ namespace BetterFG.UI.Tab
             UGUIShip.CreateLabel(root.transform, new Rect(PAD + (thirdW + PAD) * 2f, cy, thirdW, rh), "Max", FS_SM, new Color(1f, 1f, 1f, 0.72f));
             cy += rh + SH;
 
-            _incMinField = UGUIShip.CreateInputField(root.transform, new Rect(PAD, cy, thirdW, BTN_H),
-                "0.25", new Color(0.12f, 0.12f, 0.12f, 1f), WHITE, FS_SM);
-            UGUIShip.SetInputText(_incMinField, CreativeIncrements.Min.ToString(ci), false);
-            _incMinField.onEndEdit.AddListener(new Action<string>(v =>
-            {
-                if (float.TryParse(v, System.Globalization.NumberStyles.Float, ci, out var f)) CreativeIncrements.Min = f;
-                UGUIShip.SetInputText(_incMinField, CreativeIncrements.Min.ToString(ci), false);
-            }));
-
-            _incStepField = UGUIShip.CreateInputField(root.transform, new Rect(PAD + (thirdW + PAD), cy, thirdW, BTN_H),
-                "0.25", new Color(0.12f, 0.12f, 0.12f, 1f), WHITE, FS_SM);
-            UGUIShip.SetInputText(_incStepField, CreativeIncrements.Step.ToString(ci), false);
-            _incStepField.onEndEdit.AddListener(new Action<string>(v =>
-            {
-                if (float.TryParse(v, System.Globalization.NumberStyles.Float, ci, out var f)) CreativeIncrements.Step = f;
-                UGUIShip.SetInputText(_incStepField, CreativeIncrements.Step.ToString(ci), false);
-            }));
-
-            _incMaxField = UGUIShip.CreateInputField(root.transform, new Rect(PAD + (thirdW + PAD) * 2f, cy, thirdW, BTN_H),
-                "10", new Color(0.12f, 0.12f, 0.12f, 1f), WHITE, FS_SM);
-            UGUIShip.SetInputText(_incMaxField, CreativeIncrements.Max.ToString(ci), false);
-            _incMaxField.onEndEdit.AddListener(new Action<string>(v =>
-            {
-                if (float.TryParse(v, System.Globalization.NumberStyles.Float, ci, out var f)) CreativeIncrements.Max = f;
-                UGUIShip.SetInputText(_incMaxField, CreativeIncrements.Max.ToString(ci), false);
-            }));
-            cy += BTN_H + SH * 2f;
+            UGUIShip.CreateIncrement(root.transform, new Rect(PAD, cy, thirdW, incH),
+                0f, 100f, () => CreativeIncrements.Min, v => CreativeIncrements.Min = v,
+                0.25f, true, false, FS_SM);
+            UGUIShip.CreateIncrement(root.transform, new Rect(PAD + (thirdW + PAD), cy, thirdW, incH),
+                0.01f, 25f, () => CreativeIncrements.Step, v => CreativeIncrements.Step = v,
+                0.05f, true, false, FS_SM);
+            UGUIShip.CreateIncrement(root.transform, new Rect(PAD + (thirdW + PAD) * 2f, cy, thirdW, incH),
+                1f, 1000f, () => CreativeIncrements.Max, v => CreativeIncrements.Max = v,
+                5f, true, false, FS_SM);
+            cy += incH + SH * 2f;
 
             // increment speed = nav cooldown (lower = scrolls faster when held)
             UGUIShip.CreateLabel(root.transform, new Rect(PAD, cy, w, rh), "Increment speed (lower = faster)", FS_SM, new Color(1f, 1f, 1f, 0.72f));
             cy += rh + SH;
 
-            _incSpeedField = UGUIShip.CreateInputField(root.transform, new Rect(PAD, cy, thirdW, BTN_H),
-                "0.2", new Color(0.12f, 0.12f, 0.12f, 1f), WHITE, FS_SM);
-            UGUIShip.SetInputText(_incSpeedField, CreativeIncrements.Speed.ToString(ci), false);
-            _incSpeedField.onEndEdit.AddListener(new Action<string>(v =>
-            {
-                if (float.TryParse(v, System.Globalization.NumberStyles.Float, ci, out var f)) CreativeIncrements.Speed = f;
-                UGUIShip.SetInputText(_incSpeedField, CreativeIncrements.Speed.ToString(ci), false);
-            }));
-            cy += BTN_H + SH;
+            UGUIShip.CreateIncrement(root.transform, new Rect(PAD, cy, thirdW, incH),
+                0.01f, 1f, () => CreativeIncrements.Speed, v => CreativeIncrements.Speed = v,
+                0.01f, true, false, FS_SM);
+            cy += incH + SH;
 
             UGUIShip.CreateLabel(root.transform, new Rect(PAD, cy, w, rh * 2f),
                 "reopen a parameter menu to apply. generates 0 to max in your step.", FS_SM, HINT);
