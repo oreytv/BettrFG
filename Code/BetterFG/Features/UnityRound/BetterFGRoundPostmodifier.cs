@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using BepInEx.Unity.IL2CPP.Utils.Collections;
 using BetterFG.Features.UnityRound.Behaviours;
 using FG.Common;
@@ -23,8 +24,17 @@ namespace BetterFG.Features.UnityRound
             RemapPhysicMaterials(round);
             DisableLightProbesOnAllRenderers();
             RegisterEndgoals(round);
-            DisableCreativeModeObjects(disablePlaceables: true, keepExisting: info != null && info.keepExistingObjects);
+            BetterFGUnityRounds.Instance.StartCoroutine(DisableCreativeModeObjectsSoon(info != null && info.keepExistingObjects).WrapToIl2Cpp());
             RegisterMantleTargets(round);
+        }
+
+        // the Background_ roots aren't in the scene yet the frame the round goes in, so disabling right
+        // here found nothing and left the CutoutSphere wrapping the level (skybox hidden behind it) and
+        // the LIGHTING sun burning
+        private static IEnumerator DisableCreativeModeObjectsSoon(bool keepExisting)
+        {
+            for (int i = 0; i < 5; i++) yield return null;
+            DisableCreativeModeObjects(disablePlaceables: true, keepExisting: keepExisting);
         }
 
         private static void ApplyEnvironment(MapInfo info, ref Material pendingSkybox)
@@ -166,6 +176,10 @@ namespace BetterFG.Features.UnityRound
         private static readonly System.Collections.Generic.List<GameObject> _disabled
             = new System.Collections.Generic.List<GameObject>();
 
+        // finish lines we ghosted instead of disabling, with the materials they had before
+        private static readonly System.Collections.Generic.List<(Renderer r, Il2CppReferenceArray<Material> mats)> _ghosted
+            = new System.Collections.Generic.List<(Renderer, Il2CppReferenceArray<Material>)>();
+
         // Operates only on scene 0's ROOT objects (no deep recursion - that was breaking stuff).
         // Always kills the Background LIGHTING + CutoutSphere children.
         // When not keepExisting, also disables Background_ roots and Placeable_/PB_ roots.
@@ -196,19 +210,51 @@ namespace BetterFG.Features.UnityRound
                     // keep checkpoints / spawnpoints alive so the round stays playable
                     bool keep = n.IndexOf("checkpoint", StringComparison.OrdinalIgnoreCase) >= 0
                              || n.IndexOf("spawnpoint", StringComparison.OrdinalIgnoreCase) >= 0;
-                    if (!keep) Disable(root);
+                    if (keep) continue;
+
+                    // finish lines never switch off, you'd lose the end of the round. ghost them instead
+                    if (n.IndexOf("Floor", StringComparison.OrdinalIgnoreCase) >= 0
+                        && n.IndexOf("End", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        Ghost(root);
+                        continue;
+                    }
+
+                    Disable(root);
                 }
             }
 
-            Plugin.Log.LogInfo($"BetterFGRoundPostmodifier: disabled {_disabled.Count} objects (keepExisting={keepExisting})");
+            Plugin.Log.LogInfo($"BetterFGRoundPostmodifier: disabled {_disabled.Count} objects, {_ghosted.Count} renderers ghosted (keepExisting={keepExisting})");
         }
 
-        // Re-enables exactly what DisableCreativeModeObjects switched off.
+        private static void Ghost(GameObject root)
+        {
+            var mat = Core.AssetManager.GhostMaterial;
+            if (mat == null) { Plugin.Log.LogWarning($"no ghost material, leaving {root.name} as-is"); return; }
+
+            foreach (var r in root.GetComponentsInChildren<Renderer>(includeInactive: true))
+            {
+                // load-over-load: already ghosted from the last round, don't record the ghost mat as its original
+                if (r.sharedMaterial == mat) continue;
+
+                var old = r.sharedMaterials;
+                var mats = new Il2CppReferenceArray<Material>(old.Length);
+                for (int i = 0; i < mats.Length; i++) mats[i] = mat;
+                r.sharedMaterials = mats;
+                _ghosted.Add((r, old));
+            }
+        }
+
+        // Re-enables exactly what DisableCreativeModeObjects switched off, and un-ghosts the finish lines.
         public static void RestoreCreativeModeObjects()
         {
             foreach (var go in _disabled)
                 if (go != null) go.SetActive(true);
             _disabled.Clear();
+
+            foreach (var (r, mats) in _ghosted)
+                if (r != null) r.sharedMaterials = mats;
+            _ghosted.Clear();
         }
 
         private static void Disable(Transform t) { if (t != null) Disable(t.gameObject); }

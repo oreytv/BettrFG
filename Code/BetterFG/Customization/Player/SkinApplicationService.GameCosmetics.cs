@@ -155,21 +155,9 @@ namespace BetterFG.Customization.Player
 
             if (err == null)
             {
-                // bounded wait instead of a bare `yield return op`. if the addressable load hangs
-                // (round transition thrashing addressables) or the bean/slot dies underneath us, a
-                // plain yield would suspend forever and leave pendingKey stuck — every later reapply
-                // then sees inPending=true and skips, so the cosmetic silently never comes back.
-                float waited = 0f;
-                while (!op.IsDone && waited < 8f)
-                {
-                    if (bean == null || SlotDead(slot)) break;
-                    waited += Time.unscaledDeltaTime;
-                    yield return null;
-                }
+                yield return op;
                 if (op.Status == UnityEngine.ResourceManagement.AsyncOperations.AsyncOperationStatus.Succeeded)
                     clone = op.Result;
-                else if (!op.IsDone)
-                    err = $"instantiate timed out after {waited:0.0}s";
                 else
                 {
                     try { err = op.OperationException != null ? op.OperationException.Message : "instantiate failed"; }
@@ -189,7 +177,7 @@ namespace BetterFG.Customization.Player
                 yield break;
             }
 
-            if (SlotDead(slot))
+            if (SlotDead(slot) || bean == null || beanGEO == null)
             {
                 RestoreBaseBeanVisibility(pendingKey, new AppliedSkinInfo { disabledChildren = disabled });
                 DestroyAppliedInstance(clone, true);

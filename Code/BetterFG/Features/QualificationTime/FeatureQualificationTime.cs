@@ -988,7 +988,6 @@ namespace BetterFG.Features.QualificationTime
         internal static List<(float t, Vector3 pos, Quaternion rot, int stateHash, float animTime)> _ghostFrames;
         static bool _ghostRecording;
         static int _ghostGen;
-        static Material _ghostMat;
         // ghosts currently in the round. usually one, but "All" mode spawns up to three.
         static readonly List<GameObject> _ghostGos = new List<GameObject>();
 
@@ -1063,17 +1062,6 @@ namespace BetterFG.Features.QualificationTime
 
         static string LegacyGhostPath(string cacheId) =>
             Path.Combine(GhostDir, string.Concat(cacheId.Split(Path.GetInvalidFileNameChars())) + ".ghost");
-
-        static Material GetGhostMat()
-        {
-            if (_ghostMat != null) return _ghostMat;
-            var go = AssetManager.SpawnPersistent("bettrfg_mat_ghost");
-            if (go == null) return null;
-            var mr = go.GetComponent<MeshRenderer>() ?? go.GetComponentInChildren<MeshRenderer>();
-            if (mr != null) _ghostMat = mr.sharedMaterial;
-            UnityEngine.Object.Destroy(go);
-            return _ghostMat;
-        }
 
         static Animator FindBeanAnimator(GameObject bean)
         {
@@ -1348,7 +1336,7 @@ namespace BetterFG.Features.QualificationTime
                     if (t != null && t.name.StartsWith("Body_LOD")) t.gameObject.SetActive(false);
             }
 
-            var mat = GetGhostMat();
+            var mat = AssetManager.GhostMaterial;
             if (mat == null) yield break;
             foreach (var smr in ghostGo.GetComponentsInChildren<SkinnedMeshRenderer>(true))
             {

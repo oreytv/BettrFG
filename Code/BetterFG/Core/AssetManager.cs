@@ -62,6 +62,21 @@ namespace BetterFG.Core
             }
         }
 
+        private static Material ghostMaterial;
+        public static Material GhostMaterial
+        {
+            get
+            {
+                if (ghostMaterial != null) return ghostMaterial;
+                var go = SpawnPersistent("bettrfg_mat_ghost");
+                if (go == null) return null;
+                var mr = go.GetComponent<MeshRenderer>() ?? go.GetComponentInChildren<MeshRenderer>();
+                if (mr != null) ghostMaterial = mr.sharedMaterial;
+                Destroy(go);
+                return ghostMaterial;
+            }
+        }
+
         private static Texture2D goldGreyscaleTex;
         public static Texture2D GoldGreyscaleTex
         {
