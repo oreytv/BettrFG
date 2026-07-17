@@ -242,18 +242,48 @@ namespace BetterFG.UI.Windows.Creative
             _preview = pvGo.AddComponent<Image>();
             _preview.color = _colour;
 
-            UGUIShip.CreateSlider(root, PAD, y, w - 26f, "R", _colour.r, 16f, 4f, FS_SM,
-                new Action<float>(v => { _colour.r = v; PreviewColourSet(); }),
+            var suppress = new bool[1];   // shared flag so slider↔hex don't fight (same pattern as CreateColorControls)
+            InputField hex = null;
+            void RefreshHex()
+            {
+                if (hex == null) return;
+                suppress[0] = true;
+                UGUIShip.SetInputText(hex, "#" + UGUIShip.ColorToHex(_colour.r, _colour.g, _colour.b));
+                suppress[0] = false;
+            }
+
+            var sR = UGUIShip.CreateSlider(root, PAD, y, w - 26f, "R", _colour.r, 16f, 4f, FS_SM,
+                new Action<float>(v => { if (suppress[0]) return; _colour.r = v; PreviewColourSet(); RefreshHex(); }),
                 new Color(1f, 0.4f, 0.4f), new Color(1f, 0.3f, 0.3f));
             y += 22f;
-            UGUIShip.CreateSlider(root, PAD, y, w, "G", _colour.g, 16f, 4f, FS_SM,
-                new Action<float>(v => { _colour.g = v; PreviewColourSet(); }),
+            var sG = UGUIShip.CreateSlider(root, PAD, y, w, "G", _colour.g, 16f, 4f, FS_SM,
+                new Action<float>(v => { if (suppress[0]) return; _colour.g = v; PreviewColourSet(); RefreshHex(); }),
                 new Color(0.4f, 1f, 0.4f), new Color(0.3f, 1f, 0.3f));
             y += 22f;
-            UGUIShip.CreateSlider(root, PAD, y, w, "B", _colour.b, 16f, 4f, FS_SM,
-                new Action<float>(v => { _colour.b = v; PreviewColourSet(); }),
+            var sB = UGUIShip.CreateSlider(root, PAD, y, w, "B", _colour.b, 16f, 4f, FS_SM,
+                new Action<float>(v => { if (suppress[0]) return; _colour.b = v; PreviewColourSet(); RefreshHex(); }),
                 new Color(0.4f, 0.6f, 1f), new Color(0.3f, 0.5f, 1f));
             y += 26f;
+
+            float lblW = FS_SM * 2.4f;
+            float fieldW = FS_SM * 7f;
+            UGUIShip.CreateLabel(root, new Rect(PAD, y, lblW, 16f), "HEX", FS_SM, new Color(1f, 1f, 1f, 0.35f));
+            hex = UGUIShip.CreateInputField(root, new Rect(PAD + lblW, y, fieldW, 16f), "#RRGGBB", null, null, FS_SM);
+            hex.characterLimit = 7;
+            hex.onEndEdit.AddListener(new Action<string>(txt =>
+            {
+                if (suppress[0]) return;
+                if (!UGUIShip.HexToColor(txt, out float r, out float g, out float b)) { RefreshHex(); return; }
+                _colour.r = r; _colour.g = g; _colour.b = b;
+                suppress[0] = true;
+                if (sR != null) sR.value = r;
+                if (sG != null) sG.value = g;
+                if (sB != null) sB.value = b;
+                suppress[0] = false;
+                PreviewColourSet();
+            }));
+            RefreshHex();
+            y += 22f;
         }
 
         // "modify" — brightness / contrast / hue / saturation adjust each object's OWN colour. sliders

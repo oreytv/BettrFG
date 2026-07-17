@@ -87,6 +87,7 @@ namespace BetterFG.Tweaks
             Add<AlwaysShowTimerTweak>(TweakCategory.Utility);
             Add<KeepNametagsTweak>(TweakCategory.Utility);
             Add<LevelDescriptionOnPauseTweak>(TweakCategory.Utility);
+            Add<CreativeTypeValueTweak>(TweakCategory.Utility);
             //Add<MultiShowSelectTweak>(TweakCategory.Utility); // WIP — launch confirms the highlighted show, not the pinned set; shelved
 
             // ── Misc ── cosmetic / everything else
