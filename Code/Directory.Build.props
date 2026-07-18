@@ -6,5 +6,6 @@
     <BettrFGRepoOwner>oreytv</BettrFGRepoOwner>
     <BettrFGRepoName>BettrFG</BettrFGRepoName>
     <BettrFGPayloadAssetName>BepInEx.zip</BettrFGPayloadAssetName>
+    <KillAndRestartGame Condition="'$(KillAndRestartGame)' == ''">true</KillAndRestartGame>
   </PropertyGroup>
 </Project>

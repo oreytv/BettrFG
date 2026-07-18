@@ -1,24 +1,20 @@
 #pragma warning disable CS8981
-using Microsoft.Win32;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
-using System.Drawing.Imaging;
 using System.IO;
-using System.IO.Compression;
 using System.Linq;
 using System.Net.Http;
 using System.Reflection;
-using System.Security.Cryptography;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace BetterFG.Installer;
 
-public sealed class installerform : Form
+public sealed partial class installerform : Form
 {
     private static readonly HttpClient http = new HttpClient();
 
@@ -26,21 +22,53 @@ public sealed class installerform : Form
     private readonly TextBox gamePathBox;
     private readonly TextBox logBox;
     private readonly bfgbutton installButton;
+    private readonly bfgbutton modifyButton;
     private readonly bfgbutton uninstallButton;
-    private readonly bfgbutton turnOnModsButton;
-    private readonly bfgbutton turnOffModsButton;
+    private readonly bfgbutton opInstallButton;
     private readonly Label statusLabel;
-    private readonly Label releaseLabel;
-    private readonly Label installedLabel;
+    private readonly Label hubStatusLabel;
+    private readonly Label hubFolderLabel;
     private readonly ProgressBar progressBar;
+    private readonly ToolTip installTip = new ToolTip();
+
+    private readonly Label stepTitleLabel;
+    private readonly bfgbutton steamButton;
+    private readonly bfgbutton epicButton;
+    private readonly bfgbutton browseButton;
+    private readonly bfgbutton openFolderButton;
+    private readonly bfgbutton launchButton;
+    private readonly bfgbutton backButton;
+    private readonly ComboBox versionCombo;
+    private string? steamPath;
+    private string? epicPath;
+    private string? lastBrowsedFolder;
+    private readonly List<Control> step1Controls = new();
+    private readonly List<Control> step2Controls = new();
+    private readonly List<Control> step3Controls = new();
+    private readonly List<Control> logControls = new();
+    private int currentStep = 1;
+    private bfgop currentOp;
+
+    private readonly Form fadeOverlay;
+    private readonly System.Windows.Forms.Timer fadeTimer;
+    private readonly Stopwatch fadeClock = new();
+    private int fadePendingStep;
+    private bool fadePhase2;
+    private bool fadeSwap;
+    private bool fadeFull;
+    private const int FadeMs = 1000;
 
     private releaseinfo? latestRelease;
+    private releaseinfo? selectedRelease;
+    private List<releaseinfo> availableReleases = new();
     private bool releaseCheckRunning;
-    private string releaseStatusText = "latest: checking github release...";
 
     private static readonly Bitmap buttonShineTex = LoadBitmap("assets.button_shine_pinkbg.png");
+    private static readonly Bitmap blueButtonShineTex = LoadBitmap("assets.button_shine_bluebg.png");
+    private static readonly Bitmap yellowButtonShineTex = LoadBitmap("assets.button_shine_yellowbg.png");
+    private static readonly Bitmap steamIconTex = LoadBitmap("assets.icon_logo_steam.png");
+    private static readonly Bitmap epicIconTex = LoadBitmap("assets.icon_logo_epic.png");
     private static readonly Bitmap windowTex = LoadBitmap("assets.ui.windows.generalbg.png");
-    private static readonly Bitmap windowHoverTex = LoadBitmap("assets.ui.windows.generalbg_hover.png");
     private static readonly Bitmap logoTex = LoadBitmap("assets.ui.betterfglogo.png");
     private static readonly Icon appIcon = LoadIcon("assets.betterfg.ico");
 
@@ -68,7 +96,6 @@ public sealed class installerform : Form
             Size = new Size(ClientSize.Width - 8, ClientSize.Height - 8),
             Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
             BackTexture = windowTex,
-            HoverTexture = windowHoverTex,
             Padding = new Padding(0)
         };
         Controls.Add(shellPanel);
@@ -83,75 +110,168 @@ public sealed class installerform : Form
             Location = new Point(9, 6),
             Size = new Size(logoW, logoH)
         };
+        shellPanel.Controls.Add(logo);
 
-        var pathLabel = new Label
+        stepTitleLabel = new Label
         {
-            Text = "Fall Guys folder",
-            Font = new Font("Arial", 8.25f, FontStyle.Bold),
+            Text = "Step 1 of 3 / Choose your Fall Guys",
+            Font = new Font("Arial", 11f, FontStyle.Bold),
             AutoSize = true,
             ForeColor = Color.White,
             BackColor = Color.Transparent,
-            Location = new Point(9, 58)
+            Location = new Point(9, 62)
         };
+        shellPanel.Controls.Add(stepTitleLabel);
 
-        gamePathBox = new TextBox
+        backButton = new bfgbutton
         {
-            Font = new Font("Arial", 9f, FontStyle.Regular),
-            Location = new Point(9, 77),
-            Size = new Size(603, 24),
-            BackColor = Color.Black,
-            ForeColor = Color.White,
-            BorderStyle = BorderStyle.FixedSingle
+            Text = "Back",
+            Location = new Point(654, 28),
+            Size = new Size(90, 30)
         };
-        gamePathBox.TextChanged += (_, _) => RefreshInstallState();
+        backButton.Click += (_, _) => { if (currentStep > 1) BeginFade(currentStep - 1); };
+        shellPanel.Controls.Add(backButton);
 
-        var browseButton = new bfgbutton
+        var installs = GetFallGuysInstalls();
+        steamPath = installs.FirstOrDefault(x => x.Store == "Steam").Path;
+        epicPath = installs.FirstOrDefault(x => x.Store == "Epic").Path;
+        lastBrowsedFolder = ReadLastBrowsedFolder();
+
+        gamePathBox = new TextBox { Visible = false };
+        gamePathBox.TextChanged += (_, _) => RefreshInstallState();
+        shellPanel.Controls.Add(gamePathBox);
+
+        steamButton = new bfgbutton
+        {
+            Text = "Steam",
+            TextAlign = ContentAlignment.MiddleLeft,
+            LeftIcon = steamIconTex,
+            Location = new Point(226, 178),
+            Size = new Size(300, 50)
+        };
+        steamButton.Click += (_, _) => ChooseAndAdvance(steamPath);
+        shellPanel.Controls.Add(steamButton);
+        step1Controls.Add(steamButton);
+
+        epicButton = new bfgbutton
+        {
+            Text = "Epic",
+            TextAlign = ContentAlignment.MiddleLeft,
+            LeftIcon = epicIconTex,
+            Location = new Point(226, 242),
+            Size = new Size(300, 50)
+        };
+        epicButton.Click += (_, _) => ChooseAndAdvance(epicPath);
+        shellPanel.Controls.Add(epicButton);
+        step1Controls.Add(epicButton);
+
+        browseButton = new bfgbutton
         {
             Text = "Browse",
-            Location = new Point(617, 76),
-            Size = new Size(127, 24)
+            Location = new Point(226, 306),
+            Size = new Size(300, 50)
         };
         browseButton.Click += (_, _) => BrowseGameFolder();
+        shellPanel.Controls.Add(browseButton);
+        step1Controls.Add(browseButton);
+
+        hubFolderLabel = new Label
+        {
+            Text = "",
+            Font = new Font("Arial", 8.25f, FontStyle.Regular),
+            AutoSize = true,
+            ForeColor = Color.FromArgb(190, 190, 190),
+            BackColor = Color.Transparent,
+            Location = new Point(10, 100)
+        };
+
+        hubStatusLabel = new Label
+        {
+            Text = "checking install...",
+            Font = new Font("Arial", 12f, FontStyle.Bold),
+            AutoSize = true,
+            ForeColor = Color.White,
+            BackColor = Color.Transparent,
+            Location = new Point(10, 122)
+        };
 
         installButton = new bfgbutton
         {
             Text = "Install",
-            Location = new Point(9, 110),
-            Size = new Size(148, 26)
+            Style = bfgstyle.Blue,
+            Location = new Point(226, 196),
+            Size = new Size(300, 46)
         };
-        installButton.Click += async (_, _) => await InstallBetterfgAsync();
+        installButton.Click += (_, _) => { currentOp = bfgop.Install; BeginFade(3); };
+
+        modifyButton = new bfgbutton
+        {
+            Text = "Install a specific version",
+            Location = new Point(226, 250),
+            Size = new Size(300, 40)
+        };
+        modifyButton.Click += (_, _) => { currentOp = bfgop.Modify; BeginFade(3); };
 
         uninstallButton = new bfgbutton
         {
             Text = "Uninstall",
-            Location = new Point(160, 110),
-            Size = new Size(98, 26)
+            Location = new Point(226, 298),
+            Size = new Size(300, 40)
         };
-        uninstallButton.Click += (_, _) => UninstallBetterfg();
+        uninstallButton.Click += (_, _) => StartUninstall();
 
-        var openFolderButton = new bfgbutton
+        step2Controls.Add(hubFolderLabel);
+        step2Controls.Add(hubStatusLabel);
+        step2Controls.Add(installButton);
+        step2Controls.Add(modifyButton);
+        step2Controls.Add(uninstallButton);
+
+        versionCombo = new ComboBox
+        {
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            FlatStyle = FlatStyle.Flat,
+            Font = new Font("Arial", 8.5f, FontStyle.Bold),
+            BackColor = Color.Black,
+            ForeColor = Color.White,
+            Location = new Point(10, 124),
+            Size = new Size(180, 24)
+        };
+        versionCombo.SelectedIndexChanged += (_, _) =>
+        {
+            if (versionCombo.SelectedIndex >= 0 && versionCombo.SelectedIndex < availableReleases.Count)
+                selectedRelease = availableReleases[versionCombo.SelectedIndex];
+        };
+
+        opInstallButton = new bfgbutton
+        {
+            Text = "Install this version",
+            Style = bfgstyle.Blue,
+            Location = new Point(200, 122),
+            Size = new Size(170, 28)
+        };
+        opInstallButton.Click += async (_, _) => await InstallBetterfgAsync();
+
+        openFolderButton = new bfgbutton
         {
             Text = "Open plugins folder",
-            Location = new Point(261, 110),
-            Size = new Size(153, 26)
+            Location = new Point(10, 160),
+            Size = new Size(165, 28)
         };
         openFolderButton.Click += (_, _) => OpenPluginsFolder();
 
-        turnOnModsButton = new bfgbutton
+        launchButton = new bfgbutton
         {
-            Text = "Turn on mods",
-            Location = new Point(417, 110),
-            Size = new Size(115, 26)
+            Text = "Launch Fall Guys",
+            Style = bfgstyle.Blue,
+            Location = new Point(181, 160),
+            Size = new Size(160, 28)
         };
-        turnOnModsButton.Click += (_, _) => TurnOnMods();
+        launchButton.Click += (_, _) => LaunchGame();
 
-        turnOffModsButton = new bfgbutton
-        {
-            Text = "Turn off mods",
-            Location = new Point(535, 110),
-            Size = new Size(124, 26)
-        };
-        turnOffModsButton.Click += (_, _) => TurnOffMods();
+        step3Controls.Add(versionCombo);
+        step3Controls.Add(opInstallButton);
+        step3Controls.Add(openFolderButton);
+        step3Controls.Add(launchButton);
 
         statusLabel = new Label
         {
@@ -160,33 +280,13 @@ public sealed class installerform : Form
             ForeColor = Color.FromArgb(170, 170, 170),
             AutoSize = true,
             BackColor = Color.Transparent,
-            Location = new Point(10, 143)
-        };
-
-        releaseLabel = new Label
-        {
-            Text = releaseStatusText,
-            Font = new Font("Arial", 8.25f, FontStyle.Regular),
-            ForeColor = Color.White,
-            AutoSize = true,
-            BackColor = Color.Transparent,
-            Location = new Point(10, 160)
-        };
-
-        installedLabel = new Label
-        {
-            Text = "installed: checking folder...",
-            Font = new Font("Arial", 8.25f, FontStyle.Regular),
-            ForeColor = Color.FromArgb(210, 210, 210),
-            AutoSize = true,
-            BackColor = Color.Transparent,
-            Location = new Point(10, 177)
+            Location = new Point(10, 196)
         };
 
         logBox = new TextBox
         {
-            Location = new Point(9, 200),
-            Size = new Size(735, 266),
+            Location = new Point(9, 214),
+            Size = new Size(735, 244),
             Multiline = true,
             ScrollBars = ScrollBars.Vertical,
             ReadOnly = true,
@@ -198,67 +298,165 @@ public sealed class installerform : Form
 
         progressBar = new ProgressBar
         {
-            Location = new Point(9, 473),
-            Size = new Size(735, 13),
+            Location = new Point(9, 463),
+            Size = new Size(735, 15),
             Minimum = 0,
             Maximum = 100,
             Value = 0,
             Style = ProgressBarStyle.Continuous
         };
 
-        shellPanel.Controls.Add(logo);
-        shellPanel.Controls.Add(pathLabel);
-        shellPanel.Controls.Add(gamePathBox);
-        shellPanel.Controls.Add(browseButton);
+        logControls.Add(statusLabel);
+        logControls.Add(logBox);
+        logControls.Add(progressBar);
+
+        shellPanel.Controls.Add(hubFolderLabel);
+        shellPanel.Controls.Add(hubStatusLabel);
         shellPanel.Controls.Add(installButton);
+        shellPanel.Controls.Add(modifyButton);
         shellPanel.Controls.Add(uninstallButton);
+        shellPanel.Controls.Add(versionCombo);
+        shellPanel.Controls.Add(opInstallButton);
         shellPanel.Controls.Add(openFolderButton);
-        shellPanel.Controls.Add(turnOnModsButton);
-        shellPanel.Controls.Add(turnOffModsButton);
+        shellPanel.Controls.Add(launchButton);
         shellPanel.Controls.Add(statusLabel);
-        shellPanel.Controls.Add(releaseLabel);
-        shellPanel.Controls.Add(installedLabel);
         shellPanel.Controls.Add(logBox);
         shellPanel.Controls.Add(progressBar);
 
-        gamePathBox.Text = FindFallGuysFolder() ?? string.Empty;
         Log($"{installerstuff.DisplayName} installer booted");
         if (stampedPath != null)
             Log("stamped installer path into " + installerstuff.InstallerPathStampFile + " so the in-game updater can find me");
         else
-            Log("couldnt stamp installer path (running from a weird spot?) — in-game updater will fall back to the release page");
+            Log("couldnt stamp installer path (running from a weird spot?), in-game updater will fall back to the release page");
         Log("release page: " + installerstuff.ReleasePageUrl);
-        if (string.IsNullOrWhiteSpace(gamePathBox.Text))
-            Log("couldnt auto-find Fall Guys... pick the game folder manually");
-        else
-            Log("found Fall Guys at " + gamePathBox.Text);
+        Log($"found {installs.Count} Fall Guys install(s): steam={(steamPath != null)}, epic={(epicPath != null)}");
 
-        RefreshInstallState();
+        fadeOverlay = new fadeform
+        {
+            FormBorderStyle = FormBorderStyle.None,
+            BackColor = Color.Black,
+            ShowInTaskbar = false,
+            StartPosition = FormStartPosition.Manual,
+            Opacity = 0
+        };
+        fadeTimer = new System.Windows.Forms.Timer { Interval = 15 };
+        fadeTimer.Tick += FadeTick;
+
+        ShowStep(1);
+        Shown += (_, _) => BeginFadeIn();
         Shown += async (_, _) => await RefreshReleaseStateAsync();
     }
 
-    private string? RecordInstallerPath()
+    private void BeginFade(int nextStep)
     {
-        try
+        if (fadeTimer.Enabled)
         {
-            var exePath = Environment.ProcessPath;
-            if (string.IsNullOrWhiteSpace(exePath) || !exePath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
-                return null;
-
-            // env var too, harmless, but the file is what the mod actually reads — env vars don't
-            // reach an already-running / steam-launched game process.
-            Environment.SetEnvironmentVariable(installerstuff.InstallerPathEnvVar, exePath, EnvironmentVariableTarget.User);
-
-            var stampPath = installerstuff.InstallerPathStampFile;
-            Directory.CreateDirectory(Path.GetDirectoryName(stampPath)!);
-            File.WriteAllText(stampPath, exePath);
-            return exePath;
+            ShowStep(nextStep);
+            return;
         }
-        catch
+
+        fadePendingStep = nextStep;
+        fadeSwap = true;
+        fadeFull = false;
+        fadePhase2 = false;
+        fadeOverlay.Owner = this;
+        fadeOverlay.Bounds = RectangleToScreen(new Rectangle(0, 88, ClientSize.Width, ClientSize.Height - 88));
+        fadeOverlay.Opacity = 0;
+        fadeOverlay.Show();
+        fadeClock.Restart();
+        fadeTimer.Start();
+    }
+
+    private void BeginFadeIn()
+    {
+        fadeSwap = false;
+        fadeFull = true;
+        fadePhase2 = true;
+        fadeOverlay.Owner = this;
+        fadeOverlay.Bounds = RectangleToScreen(ClientRectangle);
+        fadeOverlay.Opacity = 1;
+        fadeOverlay.Show();
+        fadeClock.Restart();
+        fadeTimer.Start();
+    }
+
+    private void FadeTick(object? sender, EventArgs e)
+    {
+        fadeOverlay.Bounds = RectangleToScreen(fadeFull ? ClientRectangle : new Rectangle(0, 88, ClientSize.Width, ClientSize.Height - 88));
+        var t = fadeClock.ElapsedMilliseconds / (double)FadeMs;
+
+        if (!fadePhase2)
         {
-            // best-effort; the mod just falls back to opening the release page if this never lands
-            return null;
+            fadeOverlay.Opacity = Math.Min(1.0, t);
+            if (t >= 1.0)
+            {
+                if (fadeSwap)
+                    ShowStep(fadePendingStep);
+                fadePhase2 = true;
+                fadeClock.Restart();
+            }
         }
+        else
+        {
+            fadeOverlay.Opacity = Math.Max(0.0, 1.0 - t);
+            if (t >= 1.0)
+            {
+                fadeTimer.Stop();
+                fadeClock.Reset();
+                fadeOverlay.Hide();
+            }
+        }
+    }
+
+    private void ShowStep(int step)
+    {
+        currentStep = step;
+        foreach (var c in step1Controls) c.Visible = step == 1;
+        foreach (var c in step2Controls) c.Visible = step == 2;
+        foreach (var c in step3Controls) c.Visible = step == 3;
+        foreach (var c in logControls) c.Visible = step == 3;
+
+        stepTitleLabel.Visible = step > 1;
+        if (step == 2)
+            stepTitleLabel.Text = "Manage " + installerstuff.DisplayName;
+
+        if (step == 1)
+            RefreshLauncherButtons();
+
+        RefreshInstallState();
+
+        if (step == 3)
+            EnterOperation();
+    }
+
+    private void EnterOperation()
+    {
+        var modify = currentOp == bfgop.Modify;
+        versionCombo.Visible = modify;
+        opInstallButton.Visible = modify;
+
+        if (currentOp == bfgop.Install)
+        {
+            stepTitleLabel.Text = "Installing";
+            _ = InstallBetterfgAsync();
+        }
+        else if (currentOp == bfgop.Uninstall)
+        {
+            stepTitleLabel.Text = "Uninstalling";
+            UninstallBetterfg();
+        }
+        else
+        {
+            stepTitleLabel.Text = "Install a specific version";
+        }
+    }
+
+    private void ChooseAndAdvance(string? path)
+    {
+        if (path == null)
+            return;
+        gamePathBox.Text = path;
+        BeginFade(2);
     }
 
     private void BrowseGameFolder()
@@ -268,616 +466,104 @@ public sealed class installerform : Form
             Description = "Pick your Fall Guys folder"
         };
 
-        if (!string.IsNullOrWhiteSpace(gamePathBox.Text) && Directory.Exists(gamePathBox.Text))
-            dialog.SelectedPath = gamePathBox.Text;
+        var start = lastBrowsedFolder ?? steamPath ?? epicPath;
+        if (!string.IsNullOrWhiteSpace(start) && Directory.Exists(start))
+            dialog.SelectedPath = start;
 
-        if (dialog.ShowDialog(this) == DialogResult.OK)
-            gamePathBox.Text = dialog.SelectedPath;
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+            return;
+
+        var chosen = dialog.SelectedPath;
+        if (!File.Exists(Path.Combine(chosen, "FallGuys_client_game.exe")))
+        {
+            MessageBox.Show(this, "That folder doesn't have FallGuys_client_game.exe in it. Pick the actual Fall Guys folder.", "Wrong folder", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        lastBrowsedFolder = chosen;
+        WriteLastBrowsedFolder(chosen);
+        gamePathBox.Text = chosen;
+        BeginFade(2);
     }
 
-    private async Task InstallBetterfgAsync()
+    private void RefreshLauncherButtons()
     {
-        try
-        {
-            SetBusy(true, "status: installing");
-
-            var gameFolder = NormalizeGameFolder(gamePathBox.Text);
-            if (gameFolder == null)
-                return;
-
-            var release = latestRelease ?? await GetLatestReleaseAsync();
-            latestRelease = release;
-            var hasFramework = HasBepInExInstall(gameFolder);
-
-            var installedVersion = GetInstalledVersion(gameFolder);
-            if (installedVersion != null && Version.TryParse(release.version, out var latestVersion) && NormalizeVersion(installedVersion) >= NormalizeVersion(latestVersion))
-            {
-                var sameResult = MessageBox.Show(
-                    this,
-                    $"Installed {installerstuff.DisplayName} is already {VersionText(installedVersion)}. Reinstall anyway?",
-                    installerstuff.DisplayName,
-                    MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Question);
-
-                if (sameResult != DialogResult.Yes)
-                {
-                    statusLabel.Text = "status: up to date";
-                    RefreshInstallState();
-                    return;
-                }
-            }
-
-            await InstallReleaseAsync(gameFolder, release, hasFramework);
-            Log("install finished");
-            statusLabel.Text = "status: installed";
-            MessageBox.Show(this, $"{installerstuff.DisplayName} installed.", installerstuff.DisplayName, MessageBoxButtons.OK, MessageBoxIcon.Information);
-
-            if (!hasFramework)
-                TurnOnMods();
-            RefreshInstallState();
-        }
-        catch (Exception ex)
-        {
-            Log("install failed... " + ex.Message);
-            statusLabel.Text = "status: failed";
-            MessageBox.Show(this, ex.Message, $"{installerstuff.DisplayName} install failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
-        }
-        finally
-        {
-            SetBusy(false, statusLabel.Text);
-        }
+        ConfigLauncher(steamButton, "Steam", steamPath, false);
+        ConfigLauncher(epicButton, "Epic", epicPath, false);
+        ConfigLauncher(browseButton, "Browse", lastBrowsedFolder, true);
     }
 
-    private void UninstallBetterfg()
+    private void ConfigLauncher(bfgbutton btn, string label, string? path, bool isBrowse)
     {
-        try
+        var valid = path != null && File.Exists(Path.Combine(path, "FallGuys_client_game.exe"));
+        installTip.SetToolTip(btn, valid ? path! : "");
+
+        if (!valid)
         {
-            SetBusy(true, "status: uninstalling");
-
-            var gameFolder = NormalizeGameFolder(gamePathBox.Text);
-            if (gameFolder == null)
-                return;
-
-            var pluginFolder = Path.Combine(gameFolder, "BepInEx", "plugins", installerstuff.PluginFolderName);
-            if (!Directory.Exists(pluginFolder))
-            {
-                Log("plugin folder wasnt there");
-                statusLabel.Text = "status: nothing to remove";
-                RefreshInstallState();
-                return;
-            }
-
-            var fullPluginFolder = Path.GetFullPath(pluginFolder);
-            var expectedTail = Path.Combine("BepInEx", "plugins", installerstuff.PluginFolderName);
-            if (!fullPluginFolder.Contains(expectedTail, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("refused to remove weird path");
-
-            Directory.Delete(fullPluginFolder, true);
-            Log("removed " + fullPluginFolder);
-
-            var turnOffFile = Path.Combine(gameFolder, "TURN_OFF_CEP_CE.bat");
-            if (File.Exists(turnOffFile))
-            {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = turnOffFile,
-                    UseShellExecute = true,
-                    WorkingDirectory = gameFolder
-                });
-                Log("started TURN_OFF_CEP_CE.bat");
-            }
-            else
-            {
-                Log("TURN_OFF_CEP_CE.bat not found... skipped");
-            }
-
-            statusLabel.Text = "status: removed";
-            MessageBox.Show(this, $"{installerstuff.DisplayName} removed.", installerstuff.DisplayName, MessageBoxButtons.OK, MessageBoxIcon.Information);
-            RefreshInstallState();
+            btn.Text = isBrowse ? "Browse for your Fall Guys folder" : label + "  -  Fall Guys not found here";
+            btn.Enabled = isBrowse;
+            btn.Style = bfgstyle.Pink;
+            return;
         }
-        catch (Exception ex)
+
+        btn.Enabled = true;
+        var installed = GetInstalledVersion(path!);
+        if (installed != null)
         {
-            Log("uninstall failed... " + ex.Message);
-            statusLabel.Text = "status: failed";
-            MessageBox.Show(this, ex.Message, $"{installerstuff.DisplayName} uninstall failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            btn.Text = $"{label}  -  {installerstuff.DisplayName} {VersionText(installed)} installed";
+            btn.Style = bfgstyle.Yellow;
         }
-        finally
+        else
         {
-            SetBusy(false, statusLabel.Text);
+            btn.Text = $"{label}  -  mods not installed";
+            btn.Style = bfgstyle.Pink;
         }
-    }
-
-    private void OpenPluginsFolder()
-    {
-        try
-        {
-            var gameFolder = NormalizeGameFolder(gamePathBox.Text);
-            if (gameFolder == null)
-                return;
-
-            var pluginFolder = Path.Combine(gameFolder, "BepInEx", "plugins");
-            Directory.CreateDirectory(pluginFolder);
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = pluginFolder,
-                UseShellExecute = true
-            });
-        }
-        catch (Exception ex)
-        {
-            Log("open folder failed... " + ex.Message);
-        }
-    }
-
-    private void TurnOnMods()
-    {
-        try
-        {
-            SetBusy(true, "status: turning on mods");
-            var gameFolder = NormalizeGameFolder(gamePathBox.Text);
-            if (gameFolder == null)
-                return;
-
-            var batchFile = Path.Combine(gameFolder, "INSTALL_CEP_CE.bat");
-            if (!File.Exists(batchFile))
-            {
-                Log("INSTALL_CEP_CE.bat not found in game folder");
-                MessageBox.Show(this, "INSTALL_CEP_CE.bat not found in the game folder.", "File not found", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = batchFile,
-                UseShellExecute = true,
-                WorkingDirectory = gameFolder
-            });
-
-            Log("started INSTALL_CEP_CE.bat");
-            statusLabel.Text = "status: running turn on mods";
-        }
-        catch (Exception ex)
-        {
-            Log("turn on mods failed... " + ex.Message);
-            statusLabel.Text = "status: failed";
-            MessageBox.Show(this, ex.Message, "Turn on mods failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
-        }
-        finally
-        {
-            SetBusy(false, statusLabel.Text);
-        }
-    }
-
-    private void TurnOffMods()
-    {
-        try
-        {
-            SetBusy(true, "status: turning off mods");
-            var gameFolder = NormalizeGameFolder(gamePathBox.Text);
-            if (gameFolder == null)
-                return;
-
-            var batchFile = Path.Combine(gameFolder, "TURN_OFF_CEP_CE.bat");
-            if (!File.Exists(batchFile))
-            {
-                Log("TURN_OFF_CEP_CE.bat not found in game folder");
-                MessageBox.Show(this, "TURN_OFF_CEP_CE.bat not found in the game folder.", "File not found", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = batchFile,
-                UseShellExecute = true,
-                WorkingDirectory = gameFolder
-            });
-
-            Log("started TURN_OFF_CEP_CE.bat");
-            statusLabel.Text = "status: running turn off mods";
-        }
-        catch (Exception ex)
-        {
-            Log("turn off mods failed... " + ex.Message);
-            statusLabel.Text = "status: failed";
-            MessageBox.Show(this, ex.Message, "Turn off mods failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
-        }
-        finally
-        {
-            SetBusy(false, statusLabel.Text);
-        }
-    }
-
-    private void RefreshModToggleButtons()
-    {
-        var gameFolder = TryGetGameFolderQuiet(gamePathBox.Text);
-        turnOnModsButton.Visible = gameFolder != null && File.Exists(Path.Combine(gameFolder, "INSTALL_CEP_CE.bat"));
-        turnOffModsButton.Visible = gameFolder != null && File.Exists(Path.Combine(gameFolder, "TURN_OFF_CEP_CE.bat"));
     }
 
     private void RefreshInstallState()
     {
-        RefreshModToggleButtons();
-
-        releaseLabel.Text = latestRelease == null
-            ? releaseStatusText
-            : $"latest: {latestRelease.displayName} ({latestRelease.version})";
-
         var gameFolder = TryGetGameFolderQuiet(gamePathBox.Text);
-        if (gameFolder == null)
-        {
-            installedLabel.Text = "installed: game folder not ready";
-            installButton.Text = latestRelease == null ? "Install" : $"Install {latestRelease.version}";
-            return;
-        }
+        backButton.Visible = currentStep > 1;
+        backButton.Enabled = currentStep > 1;
 
-        var installedVersion = GetInstalledVersion(gameFolder);
+        hubFolderLabel.Text = gameFolder == null ? "no Fall Guys folder picked" : "folder: " + gameFolder;
+
+        var installedVersion = gameFolder == null ? null : GetInstalledVersion(gameFolder);
+        var latestText = latestRelease?.version;
+
         if (installedVersion == null)
         {
-            installedLabel.Text = $"installed: no {installerstuff.DisplayName} found";
-            installButton.Text = latestRelease == null ? "Install" : $"Install {latestRelease.version}";
-            return;
-        }
-
-        if (latestRelease == null || !Version.TryParse(latestRelease.version, out var latestVersion))
-        {
-            var installedText = VersionText(installedVersion);
-            installedLabel.Text = $"installed: {installedText}";
-            installButton.Text = $"Reinstall {installedText}";
-            return;
-        }
-
-        var installedNorm = NormalizeVersion(installedVersion);
-        var latestNorm = NormalizeVersion(latestVersion);
-        var installedVersionText = VersionText(installedNorm);
-
-        if (installedNorm < latestNorm)
-        {
-            installedLabel.Text = $"installed: {installedVersionText}... update available";
-            installButton.Text = $"Update to {latestRelease.version}";
-            return;
-        }
-
-        if (installedNorm > latestNorm)
-        {
-            installedLabel.Text = $"installed: {installedVersionText}... newer than github {latestRelease.version}";
-            installButton.Text = $"Reinstall {installedVersionText}";
-            return;
-        }
-
-        installedLabel.Text = $"installed: {installedVersionText}... up to date";
-        installButton.Text = $"Reinstall {installedVersionText}";
-    }
-
-    private async Task RefreshReleaseStateAsync()
-    {
-        if (releaseCheckRunning)
-            return;
-
-        releaseCheckRunning = true;
-        try
-        {
-            statusLabel.Text = "status: checking github release";
-            latestRelease = await GetLatestReleaseAsync();
-            releaseStatusText = $"latest: {latestRelease.displayName} ({latestRelease.version})";
-            statusLabel.Text = "status: waiting";
-        }
-        catch (Exception ex)
-        {
-            latestRelease = null;
-            releaseStatusText = "latest: couldnt check github release";
-            statusLabel.Text = "status: release check failed";
-            Log("release check failed... " + ex.Message);
-        }
-        finally
-        {
-            releaseCheckRunning = false;
-            RefreshInstallState();
-        }
-    }
-
-    private string? NormalizeGameFolder(string rawPath)
-    {
-        if (string.IsNullOrWhiteSpace(rawPath))
-            throw new InvalidOperationException("pick the Fall Guys folder first");
-
-        var fullPath = Path.GetFullPath(rawPath.Trim());
-        if (!Directory.Exists(fullPath))
-            throw new InvalidOperationException("that folder doesnt exist");
-
-        var exePath = Path.Combine(fullPath, "FallGuys_client_game.exe");
-        if (!File.Exists(exePath))
-        {
-            Log("warning: FallGuys_client_game.exe not found in that folder. pick the correct Fall Guys folder.");
-            MessageBox.Show(this, "FallGuys_client_game.exe wasn't found in that folder.\nMake sure you picked the actual Fall Guys game folder.", "Wrong folder", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return null;
-        }
-
-        gamePathBox.Text = fullPath;
-        return fullPath;
-    }
-
-    private static string? TryGetGameFolderQuiet(string rawPath)
-    {
-        if (string.IsNullOrWhiteSpace(rawPath))
-            return null;
-
-        try
-        {
-            var fullPath = Path.GetFullPath(rawPath.Trim());
-            if (!Directory.Exists(fullPath))
-                return null;
-
-            return File.Exists(Path.Combine(fullPath, "FallGuys_client_game.exe"))
-                ? fullPath
-                : null;
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    private async Task<releaseinfo> GetLatestReleaseAsync()
-    {
-        Log("checking " + installerstuff.LatestReleaseApiUrl);
-        using var response = await http.GetAsync(installerstuff.LatestReleaseApiUrl);
-        response.EnsureSuccessStatusCode();
-
-        await using var stream = await response.Content.ReadAsStreamAsync();
-        var release = await JsonSerializer.DeserializeAsync<githublatestrelease>(stream);
-        if (release == null || string.IsNullOrWhiteSpace(release.tag_name))
-            throw new InvalidOperationException("github latest release response was invalid");
-
-        var version = NormalizeReleaseVersion(release.tag_name);
-        var pluginAsset = PickPluginPayloadAsset(release.assets, version);
-        if (pluginAsset == null || string.IsNullOrWhiteSpace(pluginAsset.browser_download_url))
-            throw new InvalidOperationException("latest github release " + release.tag_name + " did not contain " + installerstuff.PluginPayloadAssetName + ". assets: " + AssetNames(release.assets));
-
-        var baseAsset = PickBasePayloadAsset(release.assets) ?? await GetBasePayloadAssetAsync();
-
-        var displayName = string.IsNullOrWhiteSpace(release.name) ? release.tag_name : release.name.Trim();
-        Log("latest release: " + displayName + " -> plugin " + pluginAsset.name + (baseAsset != null ? ", base " + baseAsset.name : ""));
-        return new releaseinfo
-        {
-            version = version,
-            displayName = displayName,
-            pluginPayloadName = pluginAsset.name,
-            pluginPayloadUrl = pluginAsset.browser_download_url,
-            pluginPayloadDigest = pluginAsset.digest ?? "",
-            basePayloadName = baseAsset?.name ?? "",
-            basePayloadUrl = baseAsset?.browser_download_url ?? "",
-            basePayloadDigest = baseAsset?.digest ?? ""
-        };
-    }
-
-    private static githubreleaseasset? PickAsset(githubreleaseasset[] assets, string exactName)
-    {
-        return assets.FirstOrDefault(x => string.Equals(x.name, exactName, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static string AssetNames(githubreleaseasset[] assets)
-    {
-        if (assets == null || assets.Length == 0) return "(none)";
-        return string.Join(", ", assets.Select(x => string.IsNullOrWhiteSpace(x.name) ? "(blank)" : x.name));
-    }
-
-    private static githubreleaseasset? PickPluginPayloadAsset(githubreleaseasset[] assets, string version)
-    {
-        var dottedName = installerstuff.DottedPluginPayloadAssetName(version);
-        return PickAsset(assets, installerstuff.PluginPayloadAssetName)
-            ?? PickAsset(assets, installerstuff.LegacyPluginPayloadAssetName)
-            ?? PickAsset(assets, dottedName)
-            ?? assets.FirstOrDefault(x =>
-                x.name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)
-                && x.name.StartsWith(installerstuff.DisplayName + ".", StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(x.name, installerstuff.BasePayloadAssetName, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static githubreleaseasset? PickBasePayloadAsset(githubreleaseasset[] assets)
-    {
-        return PickAsset(assets, installerstuff.BasePayloadAssetName)
-            ?? PickAsset(assets, installerstuff.LegacyBasePayloadAssetName);
-    }
-
-    private async Task<githubreleaseasset?> GetBasePayloadAssetAsync()
-    {
-        try
-        {
-            Log("checking bootstrap payload " + installerstuff.BasePayloadReleaseApiUrl);
-            using var response = await http.GetAsync(installerstuff.BasePayloadReleaseApiUrl);
-            if (!response.IsSuccessStatusCode)
-            {
-                Log("bootstrap payload release not found");
-                return null;
-            }
-
-            await using var stream = await response.Content.ReadAsStreamAsync();
-            var release = await JsonSerializer.DeserializeAsync<githublatestrelease>(stream);
-            var asset = release == null ? null : PickBasePayloadAsset(release.assets);
-            if (asset == null || string.IsNullOrWhiteSpace(asset.browser_download_url))
-            {
-                Log("bootstrap release did not contain " + installerstuff.BasePayloadAssetName);
-                return null;
-            }
-
-            return asset;
-        }
-        catch (Exception ex)
-        {
-            Log("bootstrap payload check failed... " + ex.Message);
-            return null;
-        }
-    }
-
-    private async Task InstallReleaseAsync(string gameFolder, releaseinfo release, bool hasFramework)
-    {
-        if (!hasFramework)
-        {
-            if (string.IsNullOrWhiteSpace(release.basePayloadUrl))
-                throw new InvalidOperationException("latest github release did not contain " + installerstuff.BasePayloadAssetName);
-
-            Log("no bepinex install found... doing full bootstrap");
-            await DownloadAndInstallZipAsync(gameFolder, release.basePayloadName, release.basePayloadUrl, release.basePayloadDigest);
+            hubStatusLabel.Text = latestRelease == null
+                ? $"{installerstuff.DisplayName} is not installed here"
+                : $"{installerstuff.DisplayName} is not installed  -  latest is {latestText}";
+            installButton.Text = latestRelease == null ? "Install" : $"Install {latestText}";
         }
         else
         {
-            Log("found bepinex install... only updating " + installerstuff.PluginFolderName);
-        }
-
-        var pluginsFolder = Path.Combine(gameFolder, "BepInEx", "plugins");
-        Directory.CreateDirectory(pluginsFolder);
-        await DownloadAndInstallZipAsync(pluginsFolder, release.pluginPayloadName, release.pluginPayloadUrl, release.pluginPayloadDigest);
-    }
-
-    private async Task DownloadAndInstallZipAsync(string targetRoot, string payloadName, string payloadUrl, string payloadDigest)
-    {
-        Log("downloading " + payloadName + " from " + payloadUrl);
-        SetProgress(0, "status: downloading " + payloadName);
-        using var response = await http.GetAsync(payloadUrl, HttpCompletionOption.ResponseHeadersRead);
-        response.EnsureSuccessStatusCode();
-
-        var tempZip = Path.Combine(Path.GetTempPath(), "bettrfg_payload_" + Guid.NewGuid().ToString("N") + ".zip");
-        var totalBytes = response.Content.Headers.ContentLength;
-        await using (var fs = new FileStream(tempZip, FileMode.Create, FileAccess.Write, FileShare.None))
-        await using (var stream = await response.Content.ReadAsStreamAsync())
-        {
-            var buffer = new byte[1024 * 128];
-            long done = 0;
-            int read;
-            while ((read = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+            var iv = VersionText(installedVersion);
+            if (latestRelease != null && Version.TryParse(latestRelease.version, out var lv) && NormalizeVersion(installedVersion) < NormalizeVersion(lv))
             {
-                await fs.WriteAsync(buffer, 0, read);
-                done += read;
-                if (totalBytes.HasValue && totalBytes.Value > 0)
-                    SetProgress((int)Math.Min(100, done * 100 / totalBytes.Value), $"status: downloading {payloadName} {done / 1024 / 1024}mb/{totalBytes.Value / 1024 / 1024}mb");
+                hubStatusLabel.Text = $"{installerstuff.DisplayName} {iv} installed  -  update to {latestText} available";
+                installButton.Text = $"Update to {latestText}";
+            }
+            else if (latestRelease != null)
+            {
+                hubStatusLabel.Text = $"{installerstuff.DisplayName} {iv} installed  -  up to date";
+                installButton.Text = $"Reinstall {latestText}";
+            }
+            else
+            {
+                hubStatusLabel.Text = $"{installerstuff.DisplayName} {iv} installed";
+                installButton.Text = "Reinstall";
             }
         }
 
-        try
-        {
-            SetProgress(100, "status: verifying " + payloadName);
-            VerifyDownloadedPayload(tempZip, payloadDigest);
-            SetProgress(0, "status: extracting " + payloadName);
-            InstallPayloadFromZip(tempZip, targetRoot);
-            SetProgress(100, "status: extracted " + payloadName);
-        }
-        finally
-        {
-            if (File.Exists(tempZip))
-                File.Delete(tempZip);
-        }
-    }
+        installButton.Enabled = gameFolder != null && latestRelease != null;
+        modifyButton.Enabled = gameFolder != null && availableReleases.Count > 0;
+        uninstallButton.Visible = currentStep == 2 && installedVersion != null;
 
-    private static bool HasBepInExInstall(string gameFolder)
-    {
-        return File.Exists(Path.Combine(gameFolder, "INSTALL_CEP_CE.bat"));
-    }
-
-    private void InstallPayloadFromZip(string zipPath, string targetRoot)
-    {
-        using var zip = ZipFile.OpenRead(zipPath);
-        var fullTargetRoot = Path.GetFullPath(targetRoot);
-        var entries = zip.Entries.ToArray();
-        for (int i = 0; i < entries.Length; i++)
-        {
-            var entry = entries[i];
-            var relativePath = entry.FullName
-                .Replace('/', Path.DirectorySeparatorChar)
-                .Replace('\\', Path.DirectorySeparatorChar)
-                .TrimStart(Path.DirectorySeparatorChar);
-            if (string.IsNullOrWhiteSpace(relativePath))
-                continue;
-
-            var finalPath = Path.GetFullPath(Path.Combine(targetRoot, relativePath));
-            if (!finalPath.StartsWith(fullTargetRoot, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("payload tried to write outside the game folder");
-
-            if (entry.FullName.EndsWith("/") || entry.FullName.EndsWith("\\") || string.IsNullOrWhiteSpace(entry.Name))
-            {
-                Directory.CreateDirectory(finalPath);
-                Log("made dir " + relativePath);
-                continue;
-            }
-
-            var parentDir = Path.GetDirectoryName(finalPath);
-            if (string.IsNullOrWhiteSpace(parentDir))
-                throw new InvalidOperationException("payload file had no parent dir: " + relativePath);
-
-            Directory.CreateDirectory(parentDir);
-            entry.ExtractToFile(finalPath, true);
-            Log("wrote " + relativePath);
-            if (entries.Length > 0)
-                SetProgress((i + 1) * 100 / entries.Length, "status: extracting");
-        }
-    }
-
-    private static void VerifyDownloadedPayload(string zipPath, string digest)
-    {
-        if (string.IsNullOrWhiteSpace(digest))
-            return;
-
-        if (!digest.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase))
-            return;
-
-        var expected = digest.Substring("sha256:".Length).Trim().ToLowerInvariant();
-        using var stream = File.OpenRead(zipPath);
-        using var sha = SHA256.Create();
-        var actual = Convert.ToHexString(sha.ComputeHash(stream)).ToLowerInvariant();
-        if (!string.Equals(expected, actual, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("downloaded payload hash did not match github release digest");
-    }
-
-    private string? FindFallGuysFolder()
-    {
-        foreach (var path in GetSteamLibraryRoots())
-        {
-            var gamePath = Path.Combine(path, "steamapps", "common", "Fall Guys");
-            if (Directory.Exists(gamePath))
-                return gamePath;
-        }
-
-        return null;
-    }
-
-    private static string[] GetSteamLibraryRoots()
-    {
-        var paths = new System.Collections.Generic.List<string>();
-        using var steamKey = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\WOW6432Node\Valve\Steam")
-            ?? Registry.CurrentUser.OpenSubKey(@"Software\Valve\Steam");
-
-        var steamPath = steamKey?.GetValue("InstallPath") as string;
-        if (!string.IsNullOrWhiteSpace(steamPath))
-            paths.Add(steamPath);
-
-        if (!string.IsNullOrWhiteSpace(steamPath))
-        {
-            var libraryFile = Path.Combine(steamPath, "steamapps", "libraryfolders.vdf");
-            if (File.Exists(libraryFile))
-            {
-                foreach (var rawLine in File.ReadAllLines(libraryFile))
-                {
-                    var clean = rawLine.Trim();
-                    if (!clean.StartsWith("\""))
-                        continue;
-
-                    var parts = clean.Split('"', StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length < 2)
-                        continue;
-
-                    if (!int.TryParse(parts[0].Trim(), out _))
-                        continue;
-
-                    var libraryPath = parts[1].Replace(@"\\", @"\");
-                    if (!string.IsNullOrWhiteSpace(libraryPath))
-                        paths.Add(libraryPath);
-                }
-            }
-        }
-
-        return paths
-            .Where(Directory.Exists)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        var isSteam = gameFolder != null && gameFolder.IndexOf("steamapps", StringComparison.OrdinalIgnoreCase) >= 0;
+        launchButton.Visible = currentStep == 3 && installedVersion != null && isSteam;
     }
 
     private void Log(string text)
@@ -888,7 +574,10 @@ public sealed class installerform : Form
     private void SetBusy(bool busy, string statusText)
     {
         installButton.Enabled = !busy;
+        modifyButton.Enabled = !busy;
         uninstallButton.Enabled = !busy;
+        opInstallButton.Enabled = !busy;
+        backButton.Enabled = !busy && currentStep > 1;
         statusLabel.Text = statusText;
         UseWaitCursor = busy;
     }
@@ -929,57 +618,6 @@ public sealed class installerform : Form
         using var stream = asm.GetManifestResourceStream(resourceName)
             ?? throw new InvalidOperationException("failed opening installer icon " + endsWithName);
         return new Icon(stream);
-    }
-
-    private static Version? GetInstalledVersion(string gameFolder)
-    {
-        var dllPath = Path.Combine(gameFolder, "BepInEx", "plugins", installerstuff.PluginFolderName, installerstuff.PluginDllName);
-        if (!File.Exists(dllPath))
-            return null;
-
-        try
-        {
-            var asmVersion = AssemblyName.GetAssemblyName(dllPath).Version;
-            if (asmVersion != null)
-                return asmVersion;
-        }
-        catch
-        {
-        }
-
-        try
-        {
-            var fileVersion = FileVersionInfo.GetVersionInfo(dllPath).FileVersion;
-            if (!string.IsNullOrWhiteSpace(fileVersion) && Version.TryParse(fileVersion, out var parsed))
-                return parsed;
-        }
-        catch
-        {
-        }
-
-        return null;
-    }
-
-    private static string NormalizeReleaseVersion(string tag)
-    {
-        var clean = tag.Trim();
-        if (clean.StartsWith("v", StringComparison.OrdinalIgnoreCase))
-            clean = clean.Substring(1);
-        return clean;
-    }
-
-    private static Version NormalizeVersion(Version version)
-    {
-        return new Version(
-            Math.Max(0, version.Major),
-            Math.Max(0, version.Minor),
-            Math.Max(0, version.Build));
-    }
-
-    private static string VersionText(Version version)
-    {
-        var clean = NormalizeVersion(version);
-        return clean.Major + "." + clean.Minor + "." + clean.Build;
     }
 
     private static void DrawSliced(Graphics g, Rectangle rect, Image image, int slice)
@@ -1023,117 +661,6 @@ public sealed class installerform : Form
         if (dest.Width <= 0 || dest.Height <= 0 || src.Width <= 0 || src.Height <= 0)
             return;
         g.DrawImage(image, dest, src, GraphicsUnit.Pixel);
-    }
-
-    private sealed class bfgpanel : Panel
-    {
-        public Image? BackTexture { get; set; }
-        public Image? HoverTexture { get; set; }
-        private bool isHovering;
-
-        public bfgpanel()
-        {
-            DoubleBuffered = true;
-            BackColor = Color.Black;
-            MouseEnter += (_, _) => { isHovering = true; Invalidate(); };
-            MouseLeave += (_, _) => { isHovering = false; Invalidate(); };
-        }
-
-        protected override void OnPaintBackground(PaintEventArgs e)
-        {
-            e.Graphics.Clear(Color.Black);
-            var tex = isHovering && HoverTexture != null ? HoverTexture : BackTexture;
-            if (tex != null)
-                DrawSliced(e.Graphics, ClientRectangle, tex, 6);
-        }
-    }
-
-    private sealed class bfgbutton : Button
-    {
-        private bool hovering;
-        private bool pressing;
-
-        public bfgbutton()
-        {
-            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer, true);
-            FlatStyle = FlatStyle.Flat;
-            FlatAppearance.BorderSize = 0;
-            BackColor = Color.Black;
-            ForeColor = Color.White;
-            Font = new Font("Arial", 7.5f, FontStyle.Bold);
-            Padding = new Padding(0);
-            TabStop = false;
-            MouseEnter += (_, _) => { hovering = true; Invalidate(); };
-            MouseLeave += (_, _) => { hovering = false; pressing = false; Invalidate(); };
-            MouseDown += (_, _) => { pressing = true; Invalidate(); };
-            MouseUp += (_, _) => { pressing = false; Invalidate(); };
-        }
-
-        protected override void OnPaint(PaintEventArgs e)
-        {
-            var g = e.Graphics;
-            g.Clear(Color.Black);
-
-            if (buttonShineTex != null)
-            {
-                var oldInterpolation = g.InterpolationMode;
-                var oldPixelOffset = g.PixelOffsetMode;
-                var oldCompositing = g.CompositingQuality;
-                g.InterpolationMode = InterpolationMode.HighQualityBilinear;
-                g.PixelOffsetMode = PixelOffsetMode.HighQuality;
-                g.CompositingQuality = CompositingQuality.HighQuality;
-
-                var dest = new Rectangle(0, 0, Width, Height);
-                var src = new Rectangle(0, 0, buttonShineTex.Width, buttonShineTex.Height);
-                g.DrawImage(buttonShineTex, dest, src, GraphicsUnit.Pixel);
-
-                if (!hovering)
-                {
-                    using var darkBrush = new SolidBrush(Color.FromArgb(26, 0, 0, 0));
-                    g.FillRectangle(darkBrush, dest);
-                }
-
-                g.InterpolationMode = oldInterpolation;
-                g.PixelOffsetMode = oldPixelOffset;
-                g.CompositingQuality = oldCompositing;
-            }
-
-            using var textBrush = new SolidBrush(Enabled ? Color.White : Color.FromArgb(120, 120, 120));
-            using var sf = new StringFormat
-            {
-                Alignment = StringAlignment.Center,
-                LineAlignment = StringAlignment.Center
-            };
-            var textRect = new RectangleF(0, pressing ? 1 : 0, Width - 1, Height - 1);
-            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.SingleBitPerPixelGridFit;
-            g.DrawString(Text, Font, textBrush, textRect, sf);
-        }
-    }
-
-    private sealed class githubreleaseasset
-    {
-        public string name { get; set; } = "";
-        public string browser_download_url { get; set; } = "";
-        public string digest { get; set; } = "";
-    }
-
-    private sealed class githublatestrelease
-    {
-        public string name { get; set; } = "";
-        public string tag_name { get; set; } = "";
-        public githubreleaseasset[] assets { get; set; } = Array.Empty<githubreleaseasset>();
-    }
-
-    private sealed class releaseinfo
-    {
-        public string version { get; set; } = "";
-        public string displayName { get; set; } = "";
-        public string basePayloadName { get; set; } = "";
-        public string basePayloadUrl { get; set; } = "";
-        public string basePayloadDigest { get; set; } = "";
-        public string pluginPayloadName { get; set; } = "";
-        public string pluginPayloadUrl { get; set; } = "";
-        public string pluginPayloadDigest { get; set; } = "";
     }
 }
 #pragma warning restore CS8981

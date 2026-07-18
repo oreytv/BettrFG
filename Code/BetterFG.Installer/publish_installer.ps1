@@ -54,8 +54,24 @@ if (!(Test-Path $publishedExe)) {
     throw "published installer exe missing: $publishedExe"
 }
 
-Copy-Item -LiteralPath $publishedExe -Destination $downloadsExe -Force
+$running = Get-Process -Name "BettrFG.Installer" -ErrorAction SilentlyContinue
+if ($running) {
+    try {
+        Start-Process -FilePath "taskkill.exe" -ArgumentList "/F", "/IM", $installerExeName, "/T" -Verb RunAs -Wait -WindowStyle Hidden
+        Start-Sleep -Milliseconds 500
+    }
+    catch {
+        Write-Warning "couldnt close the running installer (UAC declined?): $($_.Exception.Message)"
+    }
+}
+
+try {
+    Copy-Item -LiteralPath $publishedExe -Destination $downloadsExe -Force
+    Write-Host "installer copied to $downloadsExe"
+}
+catch {
+    Write-Warning "couldnt copy to Downloads, installer still open. grab it from $publishDir"
+}
 
 Write-Host "installer published to $publishDir"
-Write-Host "installer copied to $downloadsExe"
 Write-Host "self-contained: $selfContainedFlag"

@@ -54,7 +54,7 @@
 	<!-- Fall Guys locks BetterFG.dll while running, which makes CopyDll fail with retries. Hard-kill the
 	     game before we compile so the plugin file is free. Best-effort: taskkill returns non-zero if the
 	     process isn't running, so ignore the exit code. -->
-	<Target Name="KillFallGuysBeforeBuild" BeforeTargets="BeforeBuild" Condition="'$(SkipCopyDll)' != 'true'">
+	<Target Name="KillFallGuysBeforeBuild" BeforeTargets="BeforeBuild" Condition="'$(SkipCopyDll)' != 'true' And '$(KillAndRestartGame)' != 'false'">
 	  <Exec Command="taskkill /F /IM FallGuys_client_game.exe /T" ContinueOnError="true" />
 	  <Exec Command="taskkill /F /IM FallGuys_client.exe /T" ContinueOnError="true" />
 	</Target>
@@ -141,7 +141,7 @@
   <Copy SourceFiles="$(TargetPath)" DestinationFolder="C:\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\plugins\BetterFG" OverwriteReadOnlyFiles="true" />
   <!-- launch here, as the last step of the copy, so it fires the instant the fresh plugin lands — not after
        the payload repack / installer / skinpackager chain (those are separate AfterTargets and drain later). -->
-  <Exec Command="cmd /c start &quot;&quot; steam://rungameid/1097150" ContinueOnError="true" Condition="'$(SkipLaunch)' != 'true'" />
+  <Exec Command="cmd /c start &quot;&quot; steam://rungameid/1097150" ContinueOnError="true" Condition="'$(SkipLaunch)' != 'true' And '$(KillAndRestartGame)' != 'false'" />
 </Target>
 
   <!-- every asset under assets/ is embedded. drop a file in the folder and it ships, no csproj edit.

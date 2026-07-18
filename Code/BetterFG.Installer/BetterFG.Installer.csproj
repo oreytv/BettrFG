@@ -15,14 +15,23 @@
     <AssemblyTitle>$(BettrFGInstallerName)</AssemblyTitle>
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     <ApplicationHighDpiMode>DpiUnaware</ApplicationHighDpiMode>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>
     <None Remove="assets\\betterfg.ico" />
     <None Remove="assets\button_shine_pinkbg.png" />
+    <None Remove="assets\button_shine_bluebg.png" />
+    <None Remove="assets\button_shine_yellowbg.png" />
+    <None Remove="assets\icon_logo_steam.png" />
+    <None Remove="assets\icon_logo_epic.png" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="assets\\betterfg.ico" />
     <EmbeddedResource Include="assets\button_shine_pinkbg.png" />
+    <EmbeddedResource Include="assets\button_shine_bluebg.png" />
+    <EmbeddedResource Include="assets\button_shine_yellowbg.png" />
+    <EmbeddedResource Include="assets\icon_logo_steam.png" />
+    <EmbeddedResource Include="assets\icon_logo_epic.png" />
   </ItemGroup>
 
   <ItemGroup>

@@ -7,9 +7,8 @@ namespace BetterFG.Installer
         public const string InstallerName = "BettrFG Installer";
         public const string RepoOwner = "oreytv";
         public const string RepoName = "BettrFG";
-        public const string BasePayloadReleaseTag = "bootstrap";
-        public const string BasePayloadAssetName = "BepInEx.zip";
-        public const string LegacyBasePayloadAssetName = "betterfg_payload.zip";
+        public const string BepInExAssetName = "BepInEx-Unity.IL2CPP-win-x64-6.0.0-be.755.zip";
+        public const string BepInExDownloadUrl = "https://builds.bepinex.dev/projects/bepinex_be/755/BepInEx-Unity.IL2CPP-win-x64-6.0.0-be.755%2B3fab71a.zip";
         public const string PluginPayloadAssetName = "bettrfg_plugin.zip";
         public const string LegacyPluginPayloadAssetName = "betterfg_plugin.zip";
         public const string PluginFolderName = "BetterFG";
@@ -27,8 +26,13 @@ namespace BetterFG.Installer
                 System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData),
                 "BettrFG", "installer_path.txt");
 
+        public static string LastFolderStampFile =>
+            System.IO.Path.Combine(
+                System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData),
+                "BettrFG", "last_folder.txt");
+
         public static string LatestReleaseApiUrl => $"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases/latest";
-        public static string BasePayloadReleaseApiUrl => $"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases/tags/{BasePayloadReleaseTag}";
+        public static string AllReleasesApiUrl => $"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases";
         public static string ReleasePageUrl => $"https://github.com/{RepoOwner}/{RepoName}/releases/latest";
         public static string DottedPluginPayloadAssetName(string version) => $"{DisplayName}.{version}.zip";
     }
