@@ -82,8 +82,9 @@ public sealed partial class installerform : Form
 
         Text = installerstuff.InstallerName;
         StartPosition = FormStartPosition.CenterScreen;
+        FormBorderStyle = FormBorderStyle.FixedSingle;
+        MaximizeBox = false;
         ClientSize = new Size(760, 500);
-        MinimumSize = new Size(760, 500);
         BackColor = Color.Black;
         ForeColor = Color.White;
         Font = new Font("Arial", 8.5f, FontStyle.Regular);
