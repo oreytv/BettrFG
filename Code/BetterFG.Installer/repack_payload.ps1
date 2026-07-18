@@ -1,6 +1,7 @@
 param(
     [string]$GameRoot = "C:\Program Files (x86)\Steam\steamapps\common\Fall Guys",
-    [string]$BuildOutput = ""
+    [string]$BuildOutput = "",
+    [switch]$CopyBuildsToDownloads
 )
 
 $ErrorActionPreference = "Stop"
@@ -45,8 +46,6 @@ $dottedPluginZipPath = Join-Path $payloadDir $dottedZipName
 
 $downloadsDir = Join-Path ([Environment]::GetFolderPath("UserProfile")) "Downloads"
 $downloadsPluginZipPath = Join-Path $downloadsDir $releaseZipName
-$downloadsLegacyPluginZipPath = Join-Path $downloadsDir $legacyReleaseZipName
-$downloadsDottedPluginZipPath = Join-Path $downloadsDir $dottedZipName
 
 $staleBepInEx = @(
     (Join-Path $payloadDir "BepInEx.zip"),
@@ -117,14 +116,13 @@ Compress-Archive -Path (Join-Path $pluginOnlyStageDir "*") -DestinationPath $plu
 Copy-Item -LiteralPath $pluginZipPath -Destination $legacyPluginZipPath -Force
 Copy-Item -LiteralPath $pluginZipPath -Destination $dottedPluginZipPath -Force
 
-if (!(Test-Path $downloadsDir)) {
-    New-Item -ItemType Directory -Path $downloadsDir | Out-Null
-}
-
-Copy-Item -LiteralPath $pluginZipPath -Destination $downloadsPluginZipPath -Force
-Copy-Item -LiteralPath $pluginZipPath -Destination $downloadsLegacyPluginZipPath -Force
-Copy-Item -LiteralPath $pluginZipPath -Destination $downloadsDottedPluginZipPath -Force
-
 Write-Host "plugin zip rebuilt at $pluginZipPath"
-Write-Host "plugin zip copied to $legacyPluginZipPath and $dottedPluginZipPath"
-Write-Host "plugin zips copied to $downloadsDir"
+Write-Host "payload zips: $legacyPluginZipPath and $dottedPluginZipPath"
+
+if ($CopyBuildsToDownloads) {
+    if (!(Test-Path $downloadsDir)) {
+        New-Item -ItemType Directory -Path $downloadsDir | Out-Null
+    }
+    Copy-Item -LiteralPath $pluginZipPath -Destination $downloadsPluginZipPath -Force
+    Write-Host "copied $releaseZipName to $downloadsDir"
+}

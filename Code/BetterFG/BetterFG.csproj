@@ -6,6 +6,13 @@
 	<PropertyGroup>
 	  <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
 	  <BuildHashFile>$(IntermediateOutputPath)BuildHash.g.cs</BuildHashFile>
+	  <!-- all default off. CopyBuildsToSteam / CopyBuildsToEpic drop the plugin into that store's Fall Guys
+	       (folders auto-discovered like the installer does); CopyBuildsToDownloads drops the built installer
+	       exe + bettrfg_plugin.zip into Downloads. plain build does none. -->
+	  <CopyBuildsToSteam Condition="'$(CopyBuildsToSteam)' == ''">false</CopyBuildsToSteam>
+	  <CopyBuildsToEpic Condition="'$(CopyBuildsToEpic)' == ''">false</CopyBuildsToEpic>
+	  <CopyBuildsToDownloads Condition="'$(CopyBuildsToDownloads)' == ''">false</CopyBuildsToDownloads>
+	  <BettrFGDownloadsFlag Condition="'$(CopyBuildsToDownloads)' == 'true'">-CopyBuildsToDownloads</BettrFGDownloadsFlag>
 	</PropertyGroup>
 	<UsingTask TaskName="ComputeBettrFGSourceHash" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
 	  <ParameterGroup>
@@ -57,6 +64,7 @@
 	<Target Name="KillFallGuysBeforeBuild" BeforeTargets="BeforeBuild" Condition="'$(SkipCopyDll)' != 'true' And '$(KillAndRestartGame)' != 'false'">
 	  <Exec Command="taskkill /F /IM FallGuys_client_game.exe /T" ContinueOnError="true" />
 	  <Exec Command="taskkill /F /IM FallGuys_client.exe /T" ContinueOnError="true" />
+	  <Exec Command="powershell -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\BetterFG.Installer\close_installer.ps1&quot;" ContinueOnError="true" />
 	</Target>
 
 	<Target Name="CopyNAudio" AfterTargets="Build">
@@ -66,11 +74,11 @@
 	</Target>
 
 	<Target Name="PackBetterFGPayload" AfterTargets="CopyDll">
-	  <Exec Command="powershell -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\BetterFG.Installer\repack_payload.ps1&quot; -BuildOutput &quot;$(TargetDir)&quot;" />
+	  <Exec Command="powershell -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\BetterFG.Installer\repack_payload.ps1&quot; $(BettrFGDownloadsFlag) -BuildOutput &quot;$(TargetDir)&quot;" />
 	</Target>
 
 	<Target Name="PublishBetterFGInstaller" AfterTargets="PackBetterFGPayload">
-	  <Exec Command="powershell -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\BetterFG.Installer\publish_installer.ps1&quot;" />
+	  <Exec Command="powershell -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\BetterFG.Installer\publish_installer.ps1&quot; $(BettrFGDownloadsFlag)" />
 	</Target>
 
 	<Target Name="PublishSkinPackager" AfterTargets="PublishBetterFGInstaller">
@@ -83,9 +91,9 @@
 	    <DownloadsDir>$(USERPROFILE)\Downloads</DownloadsDir>
 	  </PropertyGroup>
 	  <MSBuild Projects="$(SkinPackagerProject)" Targets="Build" Properties="Configuration=$(SkinPackagerConfiguration);Platform=AnyCPU" />
-	  <MakeDir Directories="$(DownloadsDir)" Condition="'$(DownloadsDir)' != '' And !Exists('$(DownloadsDir)')" />
-	  <Copy SourceFiles="$(SkinPackagerOutput)" DestinationFolder="$(DownloadsDir)" OverwriteReadOnlyFiles="true" Condition="Exists('$(SkinPackagerOutput)')" />
-	  <Copy SourceFiles="$(SkinPackagerGroupBat)" DestinationFolder="$(DownloadsDir)" OverwriteReadOnlyFiles="true" Condition="Exists('$(SkinPackagerGroupBat)')" />
+	  <MakeDir Directories="$(DownloadsDir)" Condition="'$(CopyBuildsToDownloads)' == 'true' And '$(DownloadsDir)' != '' And !Exists('$(DownloadsDir)')" />
+	  <Copy SourceFiles="$(SkinPackagerOutput)" DestinationFolder="$(DownloadsDir)" OverwriteReadOnlyFiles="true" Condition="'$(CopyBuildsToDownloads)' == 'true' And Exists('$(SkinPackagerOutput)')" />
+	  <Copy SourceFiles="$(SkinPackagerGroupBat)" DestinationFolder="$(DownloadsDir)" OverwriteReadOnlyFiles="true" Condition="'$(CopyBuildsToDownloads)' == 'true' And Exists('$(SkinPackagerGroupBat)')" />
 	</Target>
 
   <PropertyGroup>
@@ -136,12 +144,12 @@
     <DefineConstants>$(DefineConstants);XB1</DefineConstants>
   </PropertyGroup>
 
-<Target Name="CopyDll" AfterTargets="CopyNAudio" Condition="'$(SkipCopyDll)' != 'true'">
-  <MakeDir Directories="C:\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\plugins\BetterFG" />
-  <Copy SourceFiles="$(TargetPath)" DestinationFolder="C:\Program Files (x86)\Steam\steamapps\common\Fall Guys\BepinEx\plugins\BetterFG" OverwriteReadOnlyFiles="true" />
-  <!-- launch here, as the last step of the copy, so it fires the instant the fresh plugin lands — not after
-       the payload repack / installer / skinpackager chain (those are separate AfterTargets and drain later). -->
-  <Exec Command="cmd /c start &quot;&quot; steam://rungameid/1097150" ContinueOnError="true" Condition="'$(SkipLaunch)' != 'true' And '$(KillAndRestartGame)' != 'false'" />
+<Target Name="CopyDll" AfterTargets="CopyNAudio" Condition="'$(SkipCopyDll)' != 'true' And ('$(CopyBuildsToSteam)' == 'true' Or '$(CopyBuildsToEpic)' == 'true')">
+  <Exec Command="powershell -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\BetterFG.Installer\copy_plugin_to_game.ps1&quot; -Store Steam -BuildOutput &quot;$(TargetDir)&quot;" Condition="'$(CopyBuildsToSteam)' == 'true'" />
+  <Exec Command="powershell -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\BetterFG.Installer\copy_plugin_to_game.ps1&quot; -Store Epic -BuildOutput &quot;$(TargetDir)&quot;" Condition="'$(CopyBuildsToEpic)' == 'true'" />
+  <!-- launch here, right after the plugin lands, so it fires before the payload/installer/skinpackager
+       chain drains. steam:// only makes sense for a Steam copy, so gate the launch on the Steam flag. -->
+  <Exec Command="cmd /c start &quot;&quot; steam://rungameid/1097150" ContinueOnError="true" Condition="'$(CopyBuildsToSteam)' == 'true' And '$(SkipLaunch)' != 'true' And '$(KillAndRestartGame)' != 'false'" />
 </Target>
 
   <!-- every asset under assets/ is embedded. drop a file in the folder and it ships, no csproj edit.
