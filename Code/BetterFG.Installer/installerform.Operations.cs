@@ -196,24 +196,36 @@ public sealed partial class installerform
     private async Task DownloadAndInstallZipAsync(string targetRoot, string payloadName, string payloadUrl, string payloadDigest)
     {
         Log("downloading " + payloadName + " from " + payloadUrl);
-        SetProgress(0, "status: downloading " + payloadName);
-        using var response = await http.GetAsync(payloadUrl, HttpCompletionOption.ResponseHeadersRead);
-        response.EnsureSuccessStatusCode();
-
         var tempZip = Path.Combine(Path.GetTempPath(), "bettrfg_payload_" + Guid.NewGuid().ToString("N") + ".zip");
-        var totalBytes = response.Content.Headers.ContentLength;
-        await using (var fs = new FileStream(tempZip, FileMode.Create, FileAccess.Write, FileShare.None))
-        await using (var stream = await response.Content.ReadAsStreamAsync())
+
+        for (int attempt = 1; ; attempt++)
         {
-            var buffer = new byte[1024 * 128];
-            long done = 0;
-            int read;
-            while ((read = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+            try
             {
-                await fs.WriteAsync(buffer, 0, read);
-                done += read;
-                if (totalBytes.HasValue && totalBytes.Value > 0)
-                    SetProgress((int)Math.Min(100, done * 100 / totalBytes.Value), $"status: downloading {payloadName} {done / 1024 / 1024}mb/{totalBytes.Value / 1024 / 1024}mb");
+                SetProgress(0, attempt == 1 ? "status: downloading " + payloadName : $"status: downloading {payloadName} (retry {attempt})");
+                using var response = await http.GetAsync(payloadUrl, HttpCompletionOption.ResponseHeadersRead);
+                response.EnsureSuccessStatusCode();
+
+                var totalBytes = response.Content.Headers.ContentLength;
+                await using var fs = new FileStream(tempZip, FileMode.Create, FileAccess.Write, FileShare.None);
+                await using var stream = await response.Content.ReadAsStreamAsync();
+                var buffer = new byte[1024 * 128];
+                long done = 0;
+                int read;
+                while ((read = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                {
+                    await fs.WriteAsync(buffer, 0, read);
+                    done += read;
+                    if (totalBytes.HasValue && totalBytes.Value > 0)
+                        SetProgress((int)Math.Min(100, done * 100 / totalBytes.Value), $"status: downloading {payloadName} {done / 1024 / 1024}mb/{totalBytes.Value / 1024 / 1024}mb");
+                }
+                break;
+            }
+            catch (Exception ex) when (attempt < 3 && ex is HttpRequestException or IOException)
+            {
+                Log($"download blipped ({ex.Message}), retrying [{attempt}/3]");
+                if (File.Exists(tempZip)) File.Delete(tempZip);
+                await Task.Delay(2000);
             }
         }
 
