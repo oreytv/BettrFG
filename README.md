@@ -54,7 +54,7 @@ Audio:
 
 ### This is really worth noting: AI was heavily used throughout most of the process of coding this mod, I take blame for any bugs
 
-![screenshot 1](./assets/screenshot001.jpg)
+<img width="2560" height="1440" alt="Screenshot (1992)" src="https://github.com/user-attachments/assets/710008d0-fd35-465e-8b4e-2abc87dc7c4e" />
 
 # Controls
 - Press Shift Z to toggle tabs
