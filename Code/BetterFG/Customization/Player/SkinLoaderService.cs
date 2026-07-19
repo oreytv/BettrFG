@@ -327,7 +327,7 @@ namespace BetterFG.Customization.Player
 
             OnProgress?.Invoke($"Loading {skinInfo.file}...");
 
-            skinApp?.UnloadBundleForFile(skinInfo.file);
+            skinApp?.UnloadBundleForFile(skinInfo.file, force: true);
 
             // one more frame so Unity can actually release the old bundle ref
             yield return null;

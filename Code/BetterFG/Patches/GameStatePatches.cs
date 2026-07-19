@@ -58,6 +58,7 @@ namespace BetterFG.Patches.GameStates
             BetterFG.Tweaks.BfgTweak.RaiseMainMenuEntered();
 
             BetterFG.UI.Tab.NametagTab.CacheNameAssets();
+            BetterFG.UI.BetterFGUIMan.ResolveAsapFont();
 
             MenuCustomizationApplication.Instance.StartCoroutine(MenuCustomizationApplication.ReapplyForegroundFromSettingsCoroutine().WrapToIl2Cpp());
 
@@ -722,7 +723,6 @@ namespace BetterFG.Patches.GameStates
         public static void Postfix(LoadingScreenViewModel __instance)
         {
             if (__instance == null || __instance.TryCast<LoadingGameScreenViewModel>() == null) return;
-            BetterFG.UI.Tab.NametagTab.CacheNameAssets();
             BetterFG.Tweaks.ChangeSplashScreenTweak.OnLoadingScreenUpdateDisplay();
             BetterFG.Features.QualificationTime.FeatureQualificationTime.OnLoadingScreenUpdateDisplay();
         }

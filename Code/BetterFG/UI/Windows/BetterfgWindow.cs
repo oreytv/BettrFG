@@ -141,6 +141,7 @@ namespace BetterFG.UI.Windows
                 if (child != null) UnityEngine.Object.Destroy(child.gameObject);
             }
             BuildContent(_contentRt);
+            _layoutApplied = false;
         }
 
         protected void RebuildTitleExtras()
@@ -153,6 +154,7 @@ namespace BetterFG.UI.Windows
                     UnityEngine.Object.Destroy(child.gameObject);
             }
             BuildTitleExtras(_titleRoot);
+            _layoutApplied = false;
         }
 
         public void Show() => gameObject.SetActive(true);
@@ -175,8 +177,21 @@ namespace BetterFG.UI.Windows
                 HideWindow();
         }
 
+        // last-applied copies so the per-frame pass only hits the RectTransforms (interop calls that
+        // dirty the canvas) when a value actually changed, instead of re-writing constants every frame
+        private bool _layoutApplied;
+        private Vector2 _apPivot;
+        private Vector3 _apBgPos, _apBgScale, _apTitlePos, _apTitleScale, _apContentPos, _apContentScale;
+        private Vector2? _apOffMin, _apOffMax;
+
         private void ApplyRuntimeLayout()
         {
+            if (_layoutApplied && _apPivot == Pivot && _apBgPos == BgPosition && _apBgScale == BgScale
+                && _apTitlePos == TitlePosition && _apTitleScale == TitleScale
+                && _apContentPos == ContentPosition && _apContentScale == ContentScale
+                && _apOffMin == ContentOffsetMin && _apOffMax == ContentOffsetMax)
+                return;
+
             if (_rootRt != null)
                 _rootRt.pivot = Pivot;
             if (_bgRt != null) { _bgRt.localPosition = BgPosition; _bgRt.localScale = BgScale; }
@@ -188,6 +203,13 @@ namespace BetterFG.UI.Windows
                 if (ContentOffsetMin.HasValue) _contentRt.offsetMin = ContentOffsetMin.Value;
                 if (ContentOffsetMax.HasValue) _contentRt.offsetMax = ContentOffsetMax.Value;
             }
+
+            _layoutApplied = true;
+            _apPivot = Pivot;
+            _apBgPos = BgPosition; _apBgScale = BgScale;
+            _apTitlePos = TitlePosition; _apTitleScale = TitleScale;
+            _apContentPos = ContentPosition; _apContentScale = ContentScale;
+            _apOffMin = ContentOffsetMin; _apOffMax = ContentOffsetMax;
         }
 
         // ── Build ─────────────────────────────────────────────────────────────
@@ -305,22 +327,16 @@ namespace BetterFG.UI.Windows
                 dragGo.AddComponent<WindowDragHandle>().Init(_rootRt, _hoverImage);
             }
 
-            var lblGo = new GameObject("Title");
-            lblGo.transform.SetParent(titleGo.transform, false);
-            _titleLabelRt = lblGo.AddComponent<RectTransform>();
+            var t = UGUIShip.CreateLabel(titleGo.transform, default, WindowTitle.ToUpper(), FS_TITLE,
+                new Color(1f, 1f, 1f, 0.85f), TextAnchor.MiddleLeft);
+            t.fontStyle = FontStyle.Bold;
+            _titleLabelRt = t.rectTransform;
             _titleLabelRt.anchorMin = Vector2.zero;
             _titleLabelRt.anchorMax = Vector2.one;
             _titleLabelRt.offsetMin = new Vector2(PAD, 0f);
             _titleLabelRt.offsetMax = Vector2.zero;
             _titleLabelRt.localPosition = TitlePosition;
             _titleLabelRt.localScale = TitleScale;
-            var t = lblGo.AddComponent<Text>();
-            t.text = WindowTitle.ToUpper();
-            t.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            t.fontSize = FS_TITLE;
-            t.color = new Color(1f, 1f, 1f, 0.85f);
-            t.alignment = TextAnchor.MiddleLeft;
-            t.fontStyle = FontStyle.Bold;
 
             BuildTitleExtras(titleGo.transform);
         }
@@ -349,18 +365,7 @@ namespace BetterFG.UI.Windows
 
         protected static Text MakeLabel(Transform parent, Rect rect, string text, int fs, Color color,
             TextAnchor anchor = TextAnchor.MiddleLeft)
-        {
-            var go = new GameObject("Label");
-            go.transform.SetParent(parent, false);
-            UGUIShip.SetPixelRect(go.AddComponent<RectTransform>(), rect);
-            var t = go.AddComponent<Text>();
-            t.text = text;
-            t.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            t.fontSize = fs;
-            t.color = color;
-            t.alignment = anchor;
-            return t;
-        }
+            => UGUIShip.CreateLabel(parent, rect, text, fs, color, anchor);
 
         protected static void MakeSeparator(Transform parent, Rect rect)
         {

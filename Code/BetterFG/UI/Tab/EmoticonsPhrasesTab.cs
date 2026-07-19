@@ -363,21 +363,13 @@ namespace BetterFG.UI.Tab
             for (int i = 0; i < 8; i++)
             {
                 float ang = (Mathf.PI * 2f) * (i / 8f) - Mathf.PI * 0.5f; // 0 at top, clockwise
-                var numGo = new GameObject("SlotNum_" + i);
-                numGo.transform.SetParent(cloneGo.transform, false);
-                var numRt = numGo.AddComponent<RectTransform>();
+                var txt = UGUIShip.CreateLabel(cloneGo.transform, new Rect(0f, 0f, 60f, 60f),
+                    i.ToString(), 40, Color.white, TextAnchor.MiddleCenter);
+                txt.fontStyle = FontStyle.Bold;
+                var numRt = txt.rectTransform;
                 numRt.anchorMin = numRt.anchorMax = new Vector2(0.5f, 0.5f);
                 numRt.pivot = new Vector2(0.5f, 0.5f);
-                numRt.sizeDelta = new Vector2(60f, 60f);
                 numRt.anchoredPosition = new Vector2(Mathf.Cos(ang) * 150f, -Mathf.Sin(ang) * 150f);
-                var txt = numGo.AddComponent<Text>();
-                txt.text = i.ToString();
-                txt.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-                txt.fontSize = 40;
-                txt.fontStyle = FontStyle.Bold;
-                txt.alignment = TextAnchor.MiddleCenter;
-                txt.color = Color.white;
-                txt.raycastTarget = false;
             }
 
             // let the clone settle a frame, then paint the wheel

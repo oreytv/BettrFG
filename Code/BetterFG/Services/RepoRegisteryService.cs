@@ -19,6 +19,12 @@ namespace BetterFG.Services
         public string DisplayName => $"{author} / {repoName}";
     }
 
+    public class FeaturedRepo
+    {
+        public string url;         // github repo url
+        public string description; // curator's blurb from featured.json
+    }
+
     public class RepoRegistry : MonoBehaviour
     {
         public static RepoRegistry Instance { get; private set; }
@@ -26,8 +32,10 @@ namespace BetterFG.Services
         public event Action OnReposChanged;
         public event Action<string> OnValidationStatus;
         public event Action<SkinRepo, Texture2D> OnCoverLoaded;
+        public event Action OnFeaturedLoaded;
 
         public const string DEFAULT_GITHUB_URL = "https://github.com/oreytv/BetterFGPublicSkins";
+        public const string FEATURED_JSON_URL = "https://raw.githubusercontent.com/oreytv/BettrFG/main/featured.json";
         public const long MAX_BUNDLE_BYTES = 4_048_576; // temu 4 MB
 
         private const string SETTINGS_KEY = "repos.list";
@@ -41,6 +49,23 @@ namespace BetterFG.Services
         public SkinRepo Active => _active ?? (_repos.Count > 0 ? _repos[0] : null);
 
         private const string KEY_ACTIVE = "repos.active";
+
+        // featured repos — fetched once from FEATURED_JSON_URL, cached here so it survives tab rebuilds
+        private readonly List<FeaturedRepo> _featured = new List<FeaturedRepo>();
+        public IReadOnlyList<FeaturedRepo> Featured => _featured;
+        private bool _featuredFetched;
+        private bool _featuredLoading;
+        public bool FeaturedFetched => _featuredFetched;
+
+        public bool HasRepo(string githubUrl) => FindRepo(githubUrl) != null;
+
+        public SkinRepo FindRepo(string githubUrl)
+        {
+            if (string.IsNullOrEmpty(githubUrl)) return null;
+            foreach (var r in _repos)
+                if (string.Equals(r.githubUrl, githubUrl, StringComparison.OrdinalIgnoreCase)) return r;
+            return null;
+        }
 
         public Texture2D GetCover(SkinRepo repo)
         {
@@ -92,6 +117,42 @@ namespace BetterFG.Services
                 req.Dispose();
             }
             _coverLoading.Remove(repo.githubUrl);
+        }
+
+        // re-fetches on every call (guarded only against overlapping loads); fires OnFeaturedLoaded when ready
+        public void FetchFeatured()
+        {
+            if (_featuredLoading) return;
+            _featuredLoading = true;
+            StartCoroutine(FetchFeaturedCoroutine().WrapToIl2Cpp());
+        }
+
+        private IEnumerator FetchFeaturedCoroutine()
+        {
+            var req = UnityWebRequest.Get(FEATURED_JSON_URL);
+            yield return req.SendWebRequest();
+
+            if (req.result == UnityWebRequest.Result.Success)
+            {
+                ParseFeatured(req.downloadHandler.text);
+                _featuredFetched = true;
+            }
+            else OnValidationStatus?.Invoke("Couldn't load featured repos");
+
+            req.Dispose();
+            _featuredLoading = false;
+            OnFeaturedLoaded?.Invoke();
+        }
+
+        private void ParseFeatured(string json)
+        {
+            _featured.Clear();
+            foreach (string obj in BetterFG.Utilities.JsonUtil.GetArray(json, "repos"))
+            {
+                string url = BetterFG.Utilities.JsonUtil.GetValue(obj, "url");
+                if (string.IsNullOrEmpty(url)) continue;
+                _featured.Add(new FeaturedRepo { url = url, description = BetterFG.Utilities.JsonUtil.GetValue(obj, "description") });
+            }
         }
 
         void Awake()
@@ -253,7 +314,7 @@ namespace BetterFG.Services
 
         // ── Helpers ───────────────────────────────────────────────────────────
 
-        private static SkinRepo ParseRepo(string githubUrl)
+        public static SkinRepo ParseRepo(string githubUrl)
         {
             try
             {

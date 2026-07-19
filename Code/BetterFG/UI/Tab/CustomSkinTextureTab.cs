@@ -935,18 +935,12 @@ namespace BetterFG.UI.Tab
             dd.alphaFadeSpeed = 0f; // no fade in/out on the popup
             UGUIShip.WireButtonAudio(go);
 
-            var lblGo = new GameObject("Label");
-            lblGo.transform.SetParent(go.transform, false);
-            var lblRt = lblGo.AddComponent<RectTransform>();
+            var lbl = UGUIShip.CreateLabel(go.transform, default, "", FS_SM, WHITE, TextAnchor.MiddleLeft);
+            var lblRt = lbl.rectTransform;
             lblRt.anchorMin = Vector2.zero;
             lblRt.anchorMax = Vector2.one;
             lblRt.offsetMin = new Vector2(6f, 2f);
             lblRt.offsetMax = new Vector2(-24f, -2f);
-            var lbl = lblGo.AddComponent<Text>();
-            lbl.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            lbl.fontSize = FS_SM;
-            lbl.color = WHITE;
-            lbl.alignment = TextAnchor.MiddleLeft;
             dd.captionText = lbl;
 
             var templateGo = new GameObject("Template");
@@ -992,18 +986,12 @@ namespace BetterFG.UI.Tab
             var tog = itemGo.AddComponent<Toggle>();
             tog.transition = Selectable.Transition.None;
 
-            var iLblGo = new GameObject("Item Label");
-            iLblGo.transform.SetParent(itemGo.transform, false);
-            var iLblRt = iLblGo.AddComponent<RectTransform>();
+            var iLbl = UGUIShip.CreateLabel(itemGo.transform, default, "", FS_SM, WHITE, TextAnchor.MiddleLeft);
+            var iLblRt = iLbl.rectTransform;
             iLblRt.anchorMin = Vector2.zero;
             iLblRt.anchorMax = Vector2.one;
             iLblRt.offsetMin = new Vector2(4f, 0f);
             iLblRt.offsetMax = Vector2.zero;
-            var iLbl = iLblGo.AddComponent<Text>();
-            iLbl.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            iLbl.fontSize = FS_SM;
-            iLbl.color = WHITE;
-            iLbl.alignment = TextAnchor.MiddleLeft;
 
             tog.targetGraphic = itemGo.GetComponent<Image>();
             tog.isOn = true;

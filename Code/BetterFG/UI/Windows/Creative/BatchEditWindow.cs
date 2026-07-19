@@ -60,6 +60,7 @@ namespace BetterFG.UI.Windows.Creative
             return all;
         }
         private int _subtab;
+        private BatchSubtab _activeExtra; // the registered extra currently shown, so we can fire its OnHide
 
         // recolour state
         private enum RecolourMode { SetColour, Modify }
@@ -120,6 +121,12 @@ namespace BetterFG.UI.Windows.Creative
         {
             if (Instance == this) Instance = null;
             AnyOpen = false;
+            // window closing — let the shown extra tear down its world overlay.
+            if (_activeExtra != null)
+            {
+                try { _activeExtra.OnHide?.Invoke(); } catch (Exception ex) { Plugin.Log.LogError($"subtab OnHide threw: {ex}"); }
+                _activeExtra = null;
+            }
         }
 
         protected override void ManagedUpdate()
@@ -175,6 +182,16 @@ namespace BetterFG.UI.Windows.Creative
 
             var subtabs = Subtabs();
             if (_subtab >= subtabs.Length) _subtab = 0; // a registered extra vanished between opens
+
+            // fire OnHide on the extra we're leaving so its world overlay doesn't linger after a switch.
+            var extras = BatchSubtabRegistry.Extras;
+            int extraIdx = _subtab - BUILTIN_SUBTABS.Length;
+            var nowExtra = (extraIdx >= 0 && extraIdx < extras.Count) ? extras[extraIdx] : null;
+            if (_activeExtra != null && _activeExtra != nowExtra)
+            {
+                try { _activeExtra.OnHide?.Invoke(); } catch (Exception ex) { Plugin.Log.LogError($"subtab OnHide threw: {ex}"); }
+            }
+            _activeExtra = nowExtra;
 
             // ── carousel header: ‹  Style  › ──
             float arrow = 22f;

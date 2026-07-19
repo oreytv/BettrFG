@@ -194,7 +194,7 @@ namespace BetterFG.Customization.Player
                 yield break;
             }
 
-            bool localBindSkin = IsLocalInRoundBean(bean) &&
+            bool localBindSkin = (IsLocalInRoundBean(bean) || GameObjectHelper.IsLobbyCharacter(bean) || GameObjectHelper.IsUICharacter(bean) || bean.name == "LevelEditor_FallGuy(Clone)") &&
                                  (slot.skinInfo.boneOffsets == null || slot.skinInfo.boneOffsets.Count == 0);
             if (localBindSkin)
             {
@@ -281,7 +281,7 @@ namespace BetterFG.Customization.Player
 
             if (applyEx != null || clone == null) { Plugin.Log.LogError($"instantiate failed: {applyEx?.Message}"); pendingKeys.Remove(pendingKey); yield break; }
 
-            bool localBindSkin = IsLocalInRoundBean(bean) &&
+            bool localBindSkin = (IsLocalInRoundBean(bean) || GameObjectHelper.IsLobbyCharacter(bean) || GameObjectHelper.IsUICharacter(bean) || bean.name == "LevelEditor_FallGuy(Clone)") &&
                                  (slot.skinInfo.boneOffsets == null || slot.skinInfo.boneOffsets.Count == 0);
             if (localBindSkin)
             {

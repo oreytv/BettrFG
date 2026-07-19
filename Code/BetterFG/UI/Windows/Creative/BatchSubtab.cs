@@ -19,11 +19,13 @@ namespace BetterFG.UI.Windows.Creative
     {
         public static readonly List<BatchSubtab> Extras = new List<BatchSubtab>();
 
-        public static void Register(string name, Action<BatchSubtabContext> build)
+        // onHide (optional) fires when the window leaves this subtab or closes, so a module can tear down
+        // anything it left in the world (a preview overlay, say) instead of it lingering.
+        public static void Register(string name, Action<BatchSubtabContext> build, Action onHide = null)
         {
             if (string.IsNullOrEmpty(name) || build == null) { Plugin.Log.LogWarning("batch subtab register ignored — needs a name and a build fn"); return; }
             foreach (var e in Extras) if (e.Name == name) { Plugin.Log.LogWarning($"batch subtab '{name}' already registered, skipping the dupe"); return; }
-            Extras.Add(new BatchSubtab { Name = name, Build = build });
+            Extras.Add(new BatchSubtab { Name = name, Build = build, OnHide = onHide });
             Plugin.Log.LogInfo($"batch subtab '{name}' registered — {Extras.Count} extra page(s) now");
         }
     }
@@ -32,6 +34,7 @@ namespace BetterFG.UI.Windows.Creative
     {
         public string Name;
         public Action<BatchSubtabContext> Build;
+        public Action OnHide;
     }
 
     // handed to an extra subtab's build fn. Root is the window content rect (same one the built-ins get);

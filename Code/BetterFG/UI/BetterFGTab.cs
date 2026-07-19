@@ -148,20 +148,14 @@ namespace BetterFG.UI
             titleRt.offsetMin = new Vector2(0f, -UIScale.TITLE_H);
             titleRt.offsetMax = Vector2.zero;
 
-            var labelGo = new GameObject("Title");
-            labelGo.transform.SetParent(titleGo.transform, false);
-            var labelRt = labelGo.AddComponent<RectTransform>();
+            var t = UGUIShip.CreateLabel(titleGo.transform, default, TabTitle.ToUpper(), UIScale.FS_TITLE,
+                new Color(1f, 1f, 1f, 0.85f), TextAnchor.MiddleLeft);
+            t.fontStyle = FontStyle.Bold;
+            var labelRt = t.rectTransform;
             labelRt.anchorMin = Vector2.zero;
             labelRt.anchorMax = Vector2.one;
             labelRt.offsetMin = new Vector2(UIScale.PAD * 3f, 0f);
             labelRt.offsetMax = Vector2.zero;
-            var t = labelGo.AddComponent<Text>();
-            t.text = TabTitle.ToUpper();
-            t.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            t.fontSize = UIScale.FS_TITLE;
-            t.color = new Color(1f, 1f, 1f, 0.85f);
-            t.alignment = TextAnchor.MiddleLeft;
-            t.fontStyle = FontStyle.Bold;
 
             var hoverGo = new GameObject("HoverTint");
             hoverGo.transform.SetParent(titleGo.transform, false);

@@ -270,16 +270,16 @@ namespace BetterFG
                 trigger.RepoRegistry = repoRegistry;
             }
 
-            BetterFGTabRegistry.Register("Customization", () => MakeTabGo<CustomizationTab>("BetterFG_CustomizationTab"));
-            BetterFGTabRegistry.Register("Menu", () => MakeTabGo<MenuTab>("BetterFG_MenuTab"), "Main Menu");
-            BetterFGTabRegistry.Register("UI", () => MakeTabGo<UITab>("BetterFG_UITab"));
-            BetterFGTabRegistry.Register("Nametag", () => MakeTabGo<NametagTab>("BetterFG_NametagTab"));
-            BetterFGTabRegistry.Register("Phrases", () => MakeTabGo<EmoticonsPhrasesTab>("BetterFG_EPTab"), "Social");
-            BetterFGTabRegistry.Register("Features", () => MakeTabGo<FeaturesTab>("BetterFG_FeaturesTab"));
-            BetterFGTabRegistry.Register("Skin Texture", () => MakeTabGo<CustomSkinTextureTab>("BetterFG_SkinTexTab"));
-            BetterFGTabRegistry.Register("All Cosmetics", () => MakeTabGo<AllCosmeticsTab>("BetterFG_AllCosmeticsTab"));
-            BetterFGTabRegistry.Register("Creative", () => MakeTabGo<CreativeTab>("BetterFG_CreativeTab"));
-            BetterFGTabRegistry.Register("Personal Bests", () => MakeTabGo<PersonalBestTab>("BetterFG_PersonalBestTab"));
+            BetterFGTabRegistry.Register<CustomizationTab>();
+            BetterFGTabRegistry.Register<MenuTab>();
+            BetterFGTabRegistry.Register<UITab>();
+            BetterFGTabRegistry.Register<NametagTab>();
+            BetterFGTabRegistry.Register<EmoticonsPhrasesTab>();
+            BetterFGTabRegistry.Register<FeaturesTab>();
+            BetterFGTabRegistry.Register<CustomSkinTextureTab>();
+            BetterFGTabRegistry.Register<AllCosmeticsTab>();
+            BetterFGTabRegistry.Register<CreativeTab>();
+            BetterFGTabRegistry.Register<PersonalBestTab>();
 
             var uiManGo = new GameObject("BetterFG_UI");
             uiManGo.hideFlags = HideFlags.HideAndDontSave;
@@ -301,13 +301,6 @@ namespace BetterFG
             return go.AddComponent<T>();
         }
 
-        private static T MakeTabGo<T>(string name) where T : MonoBehaviour
-        {
-            var go = new GameObject(name);
-            go.hideFlags = HideFlags.HideAndDontSave;
-            UnityEngine.Object.DontDestroyOnLoad(go);
-            return go.AddComponent<T>();
-        }
     }
 
     // for ugc only

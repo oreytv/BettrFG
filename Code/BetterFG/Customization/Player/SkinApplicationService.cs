@@ -303,15 +303,18 @@ namespace BetterFG.Customization.Player
             remoteBundleFiles.Add(file);
         }
 
-        public void UnloadBundleForFile(string file)
+        public void UnloadBundleForFile(string file, bool force = false)
         {
             if (string.IsNullOrEmpty(file)) return;
             if (!loadedBundles.TryGetValue(file, out var b) || b == null) return;
-            // never unload remote-owned bundles — NetworkClient still needs them
-            if (remoteBundleFiles.Contains(file)) return;
-            Plugin.Log.LogInfo($"pre-unload bundle '{file}'");
+            // normally never unload remote-owned bundles — NetworkClient still needs them.
+            // force is the local-import path: it MUST drop the resident bundle (even a repo one)
+            // or LoadFromMemory throws "same files already loaded" on the updated copy.
+            if (remoteBundleFiles.Contains(file) && !force) return;
+            Plugin.Log.LogInfo($"pre-unload bundle '{file}'{(force ? " (forced for local import)" : "")}");
             b.Unload(false);
             loadedBundles.Remove(file);
+            remoteBundleFiles.Remove(file);
         }
 
         // called by NetworkClient.CleanupAllRemote so we can actually release remote bundles

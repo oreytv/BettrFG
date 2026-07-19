@@ -81,23 +81,16 @@ namespace BetterFG.UI
 
             // pinned header (NOT inside the scroll rect)
             float headerH = ITEM_H + 4f;
-            var titleGo = new GameObject("Title");
-            titleGo.transform.SetParent(_go.transform, false);
-            var titleRt = titleGo.AddComponent<RectTransform>();
+            var titleTxt = UGUIShip.CreateLabel(_go.transform, default, "SWITCH TAB", 15,
+                new Color(1f, 1f, 1f, 1f), TextAnchor.MiddleLeft);
+            titleTxt.fontStyle = FontStyle.Bold;
+            var titleRt = titleTxt.rectTransform;
             titleRt.anchorMin = new Vector2(0f, 1f);
             titleRt.anchorMax = new Vector2(1f, 1f);
             titleRt.pivot = new Vector2(0.5f, 1f);
             titleRt.sizeDelta = new Vector2(0f, headerH);
             titleRt.anchoredPosition = Vector2.zero;
             titleRt.offsetMin = new Vector2(10f, titleRt.offsetMin.y);
-            var titleTxt = titleGo.AddComponent<Text>();
-            titleTxt.text = "SWITCH TAB";
-            titleTxt.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            titleTxt.fontSize = 15;
-            titleTxt.fontStyle = FontStyle.Bold;
-            titleTxt.color = new Color(1f, 1f, 1f, 1f);
-            titleTxt.alignment = TextAnchor.MiddleLeft;
-            titleTxt.raycastTarget = false;
 
             // scroll (below the header)
             var scrollGo = new GameObject("Scroll");

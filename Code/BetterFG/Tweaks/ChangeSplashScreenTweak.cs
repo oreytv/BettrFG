@@ -97,9 +97,21 @@ namespace BetterFG.Tweaks
             return Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
         }
 
+        private float _nextSweep;
+
         public void ReapplySplash()
         {
             if (_customSprite == null) return;
+            // runs on every loading screen UpdateDisplay tick. re-asserting the known target is
+            // near free (Image.sprite setter no-ops when unchanged) and instantly heals the usual
+            // "game stomped the sprite back" case. the whole-heap Image scan only exists to catch a
+            // freshly spawned splash instance, so it gets a 1s throttle instead of running per tick
+            if (_targetImg != null)
+                _targetImg.sprite = _customSprite;
+
+            if (Time.realtimeSinceStartup < _nextSweep) return;
+            _nextSweep = Time.realtimeSinceStartup + 1f;
+
             foreach (var img in Resources.FindObjectsOfTypeAll<Image>())
             {
                 if (img.sprite == null || img.sprite.name != "UI_Splash") continue;

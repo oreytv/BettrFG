@@ -54,6 +54,9 @@ namespace BetterFG.Services
 
         private static readonly HashSet<int> _selfDisabled = new HashSet<int>();
         private static bool _selfWasLocked;
+        // reused across ticks — the controller lock holds every frame the UI is up with a pad, and a
+        // fresh interop list per player per frame was constant GC churn
+        private static Il2CppSystem.Collections.Generic.List<ControllerMap> _mapsBuf;
 
         public static void Tick()
         {
@@ -72,7 +75,8 @@ namespace BetterFG.Services
                     {
                         var p = ReInput.players.GetPlayer(i);
                         if (p == null) continue;
-                        var maps = new Il2CppSystem.Collections.Generic.List<ControllerMap>();
+                        var maps = _mapsBuf ??= new Il2CppSystem.Collections.Generic.List<ControllerMap>();
+                        maps.Clear();
                         p.controllers.maps.GetAllMaps(maps);
                         for (int m = 0; m < maps.Count; m++)
                         {
@@ -94,7 +98,8 @@ namespace BetterFG.Services
                 {
                     var p = ReInput.players.GetPlayer(i);
                     if (p == null) continue;
-                    var maps = new Il2CppSystem.Collections.Generic.List<ControllerMap>();
+                    var maps = _mapsBuf ??= new Il2CppSystem.Collections.Generic.List<ControllerMap>();
+                    maps.Clear();
                     p.controllers.maps.GetAllMaps(maps);
                     for (int m = 0; m < maps.Count; m++)
                     {

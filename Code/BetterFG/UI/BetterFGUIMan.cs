@@ -79,13 +79,18 @@ namespace BetterFG.UI
             _cg.blocksRaycasts = false;
         }
 
+        public bool IsShown => _cg != null && _cg.alpha > 0f;
+
+        private RectTransform _canvasRt;
+
         public void FollowMouse(Canvas canvas)
         {
             if (_fixed) return;
             if (_rt == null) return;
             if (!BetterFGUIMan.UnityMouseReady()) return;
+            if (_canvasRt == null) _canvasRt = canvas.GetComponent<RectTransform>();
             RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                canvas.GetComponent<RectTransform>(), Input.mousePosition, canvas.worldCamera, out var local);
+                _canvasRt, Input.mousePosition, canvas.worldCamera, out var local);
             _rt.anchoredPosition = local + new Vector2(10f, 18f);
         }
     }
@@ -102,7 +107,6 @@ namespace BetterFG.UI
     {
         public struct TabEntry
         {
-            public string Name;
             public string Title;
             public Func<BetterFGTab> Factory;
         }
@@ -110,54 +114,45 @@ namespace BetterFG.UI
         private static readonly List<TabEntry> _entries = new List<TabEntry>();
         public static IReadOnlyList<TabEntry> All => _entries;
 
-        public static void Register(string name, Func<BetterFGTab> factory, string title = null)
+        // a tab's identity and its display name are both just its own TabTitle — the registry never
+        // takes a separate string, so the two can never drift apart and one tab can't be added twice
+        public static void Register<T>() where T : BetterFGTab
         {
-            if (string.IsNullOrEmpty(name) || factory == null) return;
+            string title = ReadTitle<T>();
+            if (string.IsNullOrEmpty(title)) return;
 
             for (int i = 0; i < _entries.Count; i++)
-                if (_entries[i].Name == name)
+                if (_entries[i].Title == title)
                     return;
 
-            _entries.Add(new TabEntry { Name = name, Title = string.IsNullOrEmpty(title) ? name : title, Factory = factory });
+            _entries.Add(new TabEntry { Title = title, Factory = () => NewTab<T>() });
         }
 
-        public static string GetTabName(Type type)
+        public static BetterFGTab CreateTab(string title)
         {
-            // instantiate a temp to read TabTitle, or just strip "Tab" from class name as fallback
-            try
-            {
-                var go = new GameObject("_tmpTab");
-                var tab = (BetterFGTab)go.AddComponent(Il2CppInterop.Runtime.Il2CppType.From(type));
-                string title = tab.TabTitle;
-                UnityEngine.Object.Destroy(go);
-                return title;
-            }
-            catch { return type.Name.Replace("Tab", ""); }
-        }
-
-        public static BetterFGTab CreateTab(string nameOrTitle)
-        {
-            if (string.IsNullOrEmpty(nameOrTitle)) return null;
-
-            // match by registry Name first, then fall back to Title so saves persisted
-            // by display title (e.g. "Main Menu") still resolve to their tab.
+            if (string.IsNullOrEmpty(title)) return null;
             for (int i = 0; i < _entries.Count; i++)
-            {
-                var entry = _entries[i];
-                if (entry.Factory == null) continue;
-                if (entry.Name == nameOrTitle || entry.Title == nameOrTitle)
-                    return entry.Factory();
-            }
-
+                if (_entries[i].Factory != null && _entries[i].Title == title)
+                    return _entries[i].Factory();
             return null;
         }
 
-        public static string NameForTitle(string title)
+        private static BetterFGTab NewTab<T>() where T : BetterFGTab
         {
-            if (string.IsNullOrEmpty(title)) return title;
-            for (int i = 0; i < _entries.Count; i++)
-                if (_entries[i].Title == title || _entries[i].Name == title)
-                    return _entries[i].Name;
+            var go = new GameObject("BetterFG_" + typeof(T).Name);
+            go.hideFlags = HideFlags.HideAndDontSave;
+            UnityEngine.Object.DontDestroyOnLoad(go);
+            return go.AddComponent<T>();
+        }
+
+        // read TabTitle off an inactive throwaway: keeping it inactive defers Awake so its bindings
+        // never fire, and TabTitle is a plain constant getter that doesn't need the instance built
+        private static string ReadTitle<T>() where T : BetterFGTab
+        {
+            var go = new GameObject("_tmpTab");
+            go.SetActive(false);
+            string title = go.AddComponent<T>().TabTitle;
+            UnityEngine.Object.Destroy(go);
             return title;
         }
     }
@@ -171,6 +166,9 @@ namespace BetterFG.UI
         private float _hoverTime = 0f;
         private bool _tooltipShown = false;
         private bool _idlePushed = false;
+        private RectTransform _rt;
+
+        void Awake() => _rt = GetComponent<RectTransform>();
 
         void Update()
         {
@@ -207,9 +205,8 @@ namespace BetterFG.UI
 
         private bool IsMouseOver()
         {
-            var rt = GetComponent<RectTransform>();
-            if (rt == null) return false;
-            return RectTransformUtility.RectangleContainsScreenPoint(rt,
+            if (_rt == null) return false;
+            return RectTransformUtility.RectangleContainsScreenPoint(_rt,
                 new Vector2(Input.mousePosition.x, Input.mousePosition.y), null);
         }
 
@@ -239,6 +236,11 @@ namespace BetterFG.UI
         public GameObject hoverImage;
         private float _t = 0f;
         private bool _shown = false;
+        private RectTransform _rt;
+        private CanvasGroup _parentCg;
+        private bool _cgCached;
+
+        void Awake() => _rt = GetComponent<RectTransform>();
 
         void Update()
         {
@@ -250,7 +252,9 @@ namespace BetterFG.UI
                 return;
             }
 
-            var cg = GetComponentInParent<CanvasGroup>();
+            // cached on first tick, after the trigger's been parented into its window
+            if (!_cgCached) { _parentCg = GetComponentInParent<CanvasGroup>(); _cgCached = true; }
+            var cg = _parentCg;
             if (cg != null && (!cg.blocksRaycasts || cg.alpha < 0.01f))
             {
                 if (_shown) { BetterFGUIMan.Instance?.HideTooltip(); _shown = false; }
@@ -261,8 +265,9 @@ namespace BetterFG.UI
             // instant markers live in standalone windows (Tweaks etc.), not the main panel, so don't
             // gate them on the main panel being open — only the timed tab tooltips need that.
             if (!instant && BetterFGUIMan.Instance != null && !BetterFGUIMan.Instance.IsVisible) return;
+            if (_rt == null) return;
             bool over = RectTransformUtility.RectangleContainsScreenPoint(
-                GetComponent<RectTransform>(), new Vector2(Input.mousePosition.x, Input.mousePosition.y), null);
+                _rt, new Vector2(Input.mousePosition.x, Input.mousePosition.y), null);
             if (hoverImage != null) hoverImage.SetActive(over);
             if (!over) { if (_shown) { BetterFGUIMan.Instance?.HideTooltip(); _shown = false; } _t = 0f; return; }
             _t += Time.deltaTime;
@@ -340,6 +345,7 @@ namespace BetterFG.UI
         private float _startX;
 
         private Canvas _canvas;
+        private Canvas _overlayCanvas;
         private bool _visible = true;
         private GameObject _rootGo;
         private GameObject _backdropGo;
@@ -489,8 +495,8 @@ namespace BetterFG.UI
 
             if (!UnityMouseReady())
                 HideTooltip();
-            else if (_tooltip != null)
-                _tooltip.FollowMouse(_canvas);
+            else if (_tooltip != null && _tooltip.IsShown)
+                _tooltip.FollowMouse(_overlayCanvas);
 
             _dropdown.Tick();
         }
@@ -507,8 +513,10 @@ namespace BetterFG.UI
 
             // show the hint whenever the UI is open (not just in creative), since game input is
             // always locked while BettrFG is up. font isn't loaded at startup so grab it lazily.
+            // text itself is event-driven now (SetVisible / wheel toggle / rebind), only the lazy
+            // font styling still needs a per-frame chance until the game font exists
             bool hintVisible = _visible || (SideWheelManager.Instance?.IsWheelVisible ?? false);
-            if (hintVisible) { EnsureHintStyle(); UpdateCreativeHintText(); }
+            if (hintVisible) EnsureHintStyle();
             if (_creativeHintGo != null && _creativeHintGo.activeSelf != hintVisible)
                 _creativeHintGo.SetActive(hintVisible);
 
@@ -548,6 +556,13 @@ namespace BetterFG.UI
         {
             _canvas = CreateCanvas();
 
+            // tooltip + creative hint live on their own small canvas so they keep working when the
+            // main canvas is disabled (hidden UI): instant "?" tooltips in standalone windows and
+            // the input hint with just the wheel open both outlive the main panel
+            _overlayCanvas = CreateCanvas();
+            _overlayCanvas.gameObject.name = "BetterFG_OverlayCanvas";
+            _overlayCanvas.sortingOrder = 1001;
+
             _peekedY = -TAB_CONTENT_H;
             _raisedY = 0f;
             _startX = TAB_MARGIN_X;
@@ -585,9 +600,8 @@ namespace BetterFG.UI
                 string saved = SettingsService.Get(KEY_SLOT_PREFIX + i, "");
                 if (string.IsNullOrEmpty(saved)) continue;
 
-                // if slot already has this tab, skip (compare by registry name; saved may be name or legacy title)
-                if (i < _tabs.Count && _tabs[i] != null
-                    && BetterFGTabRegistry.NameForTitle(_tabs[i].TabTitle) == BetterFGTabRegistry.NameForTitle(saved)) continue;
+                // if slot already has this tab, skip
+                if (i < _tabs.Count && _tabs[i] != null && _tabs[i].TabTitle == saved) continue;
 
                 SwapSlot(i, saved, save: false);
             }
@@ -597,7 +611,7 @@ namespace BetterFG.UI
         {
             for (int i = 0; i < _tabs.Count; i++)
                 SettingsService.Set(KEY_SLOT_PREFIX + i,
-                    _tabs[i] != null ? BetterFGTabRegistry.NameForTitle(_tabs[i].TabTitle) : "");
+                    _tabs[i] != null ? _tabs[i].TabTitle : "");
         }
 
         // ── Core slot management ──────────────────────────────────────────────
@@ -703,8 +717,7 @@ namespace BetterFG.UI
             {
                 bool used = false;
                 for (int i = 0; i < _tabs.Count; i++)
-                    if (_tabs[i] != null
-                        && BetterFGTabRegistry.NameForTitle(_tabs[i].TabTitle) == BetterFGTabRegistry.NameForTitle(e.Name))
+                    if (_tabs[i] != null && _tabs[i].TabTitle == e.Title)
                     { used = true; break; }
                 if (!used) return e.Factory();
             }
@@ -747,19 +760,15 @@ namespace BetterFG.UI
 
             RectTransform tabRoot = (ownerIdx < _tabRoots.Count) ? _tabRoots[ownerIdx] : null;
 
-            var allTabs = new string[BetterFGTabRegistry.All.Count];
             var allTitles = new string[BetterFGTabRegistry.All.Count];
             for (int i = 0; i < BetterFGTabRegistry.All.Count; i++)
-            {
-                allTabs[i] = BetterFGTabRegistry.All[i].Name;
                 allTitles[i] = BetterFGTabRegistry.All[i].Title;
-            }
 
             var occupied = new string[_tabs.Count];
             for (int i = 0; i < _tabs.Count; i++)
                 occupied[i] = _tabs[i] != null ? _tabs[i].TabTitle : "";
 
-            _dropdown.Open(tabRoot, ownerIdx, owner.TabTitle, allTabs, allTitles, occupied);
+            _dropdown.Open(tabRoot, ownerIdx, owner.TabTitle, allTitles, allTitles, occupied);
         }
 
         // current-slot cell was clicked: keep the tab open, don't auto-close it
@@ -915,6 +924,7 @@ namespace BetterFG.UI
         public void OnWheelVisibilityChanged(bool visible)
         {
             UpdateCameraFreeze();
+            UpdateCreativeHintText();
         }
 
         public void SetVisible(bool visible)
@@ -936,6 +946,10 @@ namespace BetterFG.UI
                 _rootCg.blocksRaycasts = visible;
                 _rootCg.interactable = visible;
             }
+            // alpha 0 alone still submits every tab's geometry to the GPU each frame — disabling the
+            // canvas actually stops the draw. GameObjects stay active so tab coroutines/events live on
+            if (_canvas != null) _canvas.enabled = visible;
+            UpdateCreativeHintText();
 
             SettingsService.Set(KEY_UI_HIDDEN, visible ? "false" : "true");
             if (_backdropGo != null) _backdropGo.SetActive(visible);
@@ -1056,7 +1070,7 @@ namespace BetterFG.UI
             _tooltip.SetText(text);
             // place at the cursor BEFORE going visible — otherwise the first frame draws at the
             // last position (FollowMouse only runs in the next Update tick).
-            _tooltip.FollowMouse(_canvas);
+            _tooltip.FollowMouse(_overlayCanvas);
             _tooltip.SetVisible(true);
         }
 
@@ -1186,7 +1200,7 @@ namespace BetterFG.UI
         {
             var go = new GameObject("Tooltip");
             go.hideFlags = HideFlags.HideAndDontSave;
-            go.transform.SetParent(_canvas.transform, false);
+            go.transform.SetParent(_overlayCanvas.transform, false);
 
             var rt = go.AddComponent<RectTransform>();
             rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
@@ -1202,22 +1216,16 @@ namespace BetterFG.UI
             // label fills the tooltip with a small padding inset. tooltip sizes itself to text in
             // Tooltip.SetText, so no HorizontalLayoutGroup/ContentSizeFitter (those were forcing the
             // tooltip to always be the max width even on a 3-word hint).
-            var lblGo = new GameObject("Lbl");
-            lblGo.transform.SetParent(go.transform, false);
-            var lblRt = lblGo.AddComponent<RectTransform>();
+            var t = UGUIShip.CreateLabel(go.transform, default, "", 13,
+                new Color(1f, 1f, 1f, 0.9f), TextAnchor.MiddleLeft);
+            t.fontStyle = FontStyle.Bold;
+            t.horizontalOverflow = HorizontalWrapMode.Wrap;
+            t.verticalOverflow = VerticalWrapMode.Overflow;
+            var lblRt = t.rectTransform;
             lblRt.anchorMin = Vector2.zero;
             lblRt.anchorMax = Vector2.one;
             lblRt.offsetMin = new Vector2(8f, 5f);
             lblRt.offsetMax = new Vector2(-8f, -5f);
-            var t = lblGo.AddComponent<Text>();
-            t.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            t.fontSize = 13;
-            t.fontStyle = FontStyle.Bold;
-            t.color = new Color(1f, 1f, 1f, 0.9f);
-            t.alignment = TextAnchor.MiddleLeft;
-            t.horizontalOverflow = HorizontalWrapMode.Wrap;
-            t.verticalOverflow = VerticalWrapMode.Overflow;
-            t.raycastTarget = false;
 
             _tooltip.SetVisible(false);
         }
@@ -1357,17 +1365,8 @@ namespace BetterFG.UI
                 img.raycastTarget = false;
             }
 
-            var go = new GameObject("WMLine");
-            go.transform.SetParent(row.transform, false);
-            go.AddComponent<RectTransform>();
-            var t = go.AddComponent<Text>();
-            t.text = text;
-            t.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            t.fontSize = 12;
-            t.color = color;
-            t.alignment = TextAnchor.MiddleLeft;
-            t.raycastTarget = false;
-            go.AddComponent<ContentSizeFitter>().horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+            var t = UGUIShip.CreateLabel(row.transform, default, text, 12, color, TextAnchor.MiddleLeft);
+            t.gameObject.AddComponent<ContentSizeFitter>().horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
         }
 
         private void BuildControlsWatermark()
@@ -1414,7 +1413,7 @@ namespace BetterFG.UI
         {
             _creativeHintGo = new GameObject("CreativeInputHint");
             _creativeHintGo.hideFlags = HideFlags.HideAndDontSave;
-            _creativeHintGo.transform.SetParent(_canvas.transform, false);
+            _creativeHintGo.transform.SetParent(_overlayCanvas.transform, false);
 
             var rt = _creativeHintGo.AddComponent<RectTransform>();
             rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
@@ -1436,17 +1435,6 @@ namespace BetterFG.UI
             KeybindService.OnRebound += _ => UpdateCreativeHintText();
 
             _creativeHintGo.SetActive(false);
-            StartCoroutine(PollHintStyleForStartup().WrapToIl2Cpp());
-        }
-
-        private IEnumerator PollHintStyleForStartup()
-        {
-            float deadline = UnityEngine.Time.time + 10f;
-            while (!_hintStyled && UnityEngine.Time.time < deadline)
-            {
-                EnsureHintStyle();
-                yield return null;
-            }
         }
 
         private void UpdateCreativeHintText()
@@ -1476,9 +1464,12 @@ namespace BetterFG.UI
         }
 
         private static TMP_FontAsset _asapFont;
-        private static TMP_FontAsset GameAsapFont()
+
+        // the game's Asap font is loaded by the time the main menu exists, so the whole-heap scan
+        // runs exactly once from the menu-entered hub — everything else just reads the cache
+        public static void ResolveAsapFont()
         {
-            if (_asapFont != null) return _asapFont;
+            if (_asapFont != null) return;
             try
             {
                 foreach (var fa in Resources.FindObjectsOfTypeAll<TMP_FontAsset>())
@@ -1488,8 +1479,10 @@ namespace BetterFG.UI
                 }
             }
             catch (Exception ex) { Plugin.Log.LogWarning("BetterFG: asap font: " + ex.Message); }
-            return _asapFont;
+            if (_asapFont == null) Plugin.Log.LogWarning("asap font not found at menu entry?");
         }
+
+        private static TMP_FontAsset GameAsapFont() => _asapFont;
 
         private void AddWatermarkLine(string text, Color color)
             => AddWatermarkLine(_watermarkGo.transform, text, color);
@@ -1498,17 +1491,8 @@ namespace BetterFG.UI
         {
             if (string.IsNullOrWhiteSpace(text)) return;
 
-            var go = new GameObject("WMLine");
-            go.transform.SetParent(parent, false);
-            go.AddComponent<RectTransform>();
-            go.AddComponent<LayoutElement>().preferredHeight = 18f;
-            var t = go.AddComponent<Text>();
-            t.text = text;
-            t.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            t.fontSize = 12;
-            t.color = color;
-            t.alignment = TextAnchor.MiddleLeft;
-            t.raycastTarget = false;
+            var t = UGUIShip.CreateFlowLabel(parent, text, 12, color);
+            t.GetComponent<LayoutElement>().preferredHeight = 18f;
         }
 
         private static Canvas CreateCanvas()

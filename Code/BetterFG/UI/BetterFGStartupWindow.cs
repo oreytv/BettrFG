@@ -160,16 +160,11 @@ namespace BetterFG.UI
             vlg.childAlignment = TextAnchor.MiddleCenter;
 
             // Disclaimer text
-            var textGo = new GameObject("Text");
-            textGo.transform.SetParent(discGo.transform, false);
-            textGo.AddComponent<RectTransform>();
-            textGo.AddComponent<LayoutElement>().preferredHeight = DISC_H;
-            var t = textGo.AddComponent<Text>();
-            t.text = "Every single change in customization you make from this point onward\nwill be purely client-sided, and no one will see it.";
-            t.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            t.fontSize = FS_DISC;
-            t.color = WHITE;
+            var t = UGUIShip.CreateFlowLabel(discGo.transform,
+                "Every single change in customization you make from this point onward\nwill be purely client-sided, and no one will see it.",
+                FS_DISC, WHITE);
             t.alignment = TextAnchor.MiddleCenter;
+            t.GetComponent<LayoutElement>().preferredHeight = DISC_H;
 
             // Button wrapper (separate CanvasGroup for delayed fade-in)
             var btnWrap = new GameObject("BtnWrap");

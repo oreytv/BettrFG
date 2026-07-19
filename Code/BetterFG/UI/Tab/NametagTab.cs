@@ -17,9 +17,8 @@ using FGClient;
 namespace BetterFG.UI.Tab
 {
     // the nametag font + materials don't exist at the absolute start of the game (nothing loaded yet),
-    // so cache them once the menu is entered and again when a loading screen shows — that's when the
-    // game has those assets around. NametagTab.CacheNameAssets is idempotent (early-outs once filled).
-    // both are driven from the shared OnMainMenuEntered + LoadingScreenViewModel.UpdateDisplay hubs.
+    // so cache them on main menu enter — that's when the game has those assets around. one call from
+    // OnMainMenuEntered, not a per-frame poll. re-entering the menu is harmless (early-outs once filled).
 
     public class NametagTab : BetterFGTab
     {
@@ -78,19 +77,24 @@ namespace BetterFG.UI.Tab
         // ── Cached name assets ────────────────────────────────────────────────
         // the nametag font + materials only exist once the game has loaded into the menu.
         // building the preview at the absolute start of the game (nothing loaded) finds nothing,
-        // so we cache them on menu-entered / loading-screen-show and the preview reads these.
+        // so we cache them on main menu enter and the preview reads these.
         private static TMP_FontAsset _cachedFont;
         private static Material _cachedDefaultMat;
         private static Material _cachedGoldMat;
 
         public static void CacheNameAssets()
         {
-            if (_cachedFont == null) _cachedFont = BetterFG.Core.AssetManager.NameFontAsset;
-            if (_cachedDefaultMat == null) _cachedDefaultMat = BetterFG.Core.AssetManager.DefaultNameMaterial;
-            if (_cachedGoldMat == null) _cachedGoldMat = BetterFG.Core.AssetManager.GoldNameMaterial;
+            // called once per main menu enter. each unresolved asset is a whole-heap scan inside
+            // AssetManager, so bail the moment everything's cached — re-entering the menu is a no-op
+            if (_cachedFont != null && _cachedDefaultMat != null && _cachedGoldMat != null) return;
+
+            bool resolved = false;
+            if (_cachedFont == null && (_cachedFont = BetterFG.Core.AssetManager.NameFontAsset) != null) resolved = true;
+            if (_cachedDefaultMat == null && (_cachedDefaultMat = BetterFG.Core.AssetManager.DefaultNameMaterial) != null) resolved = true;
+            if (_cachedGoldMat == null && (_cachedGoldMat = BetterFG.Core.AssetManager.GoldNameMaterial) != null) resolved = true;
             // if the tab is already open, the preview may have been built before a nametag existed to clone —
             // refresh it now that assets (and likely a live canvas) exist.
-            if (Instance != null) Instance.RefreshPreview();
+            if (resolved && Instance != null) Instance.RefreshPreview();
         }
 
         // ── State ─────────────────────────────────────────────────────────────
@@ -594,19 +598,13 @@ namespace BetterFG.UI.Tab
                 btn.colors = cols;
                 btn.onClick.AddListener(new Action(() => OnSelectCountry(captured)));
 
-                var lbl = new GameObject("Label");
-                lbl.transform.SetParent(rowGo.transform, false);
-                var lblRt = lbl.AddComponent<RectTransform>();
+                var t = UGUIShip.CreateLabel(rowGo.transform, default, code, FS_SM,
+                    isSelected ? WHITE : new Color(1f, 1f, 1f, 0.7f), TextAnchor.MiddleLeft);
+                var lblRt = t.rectTransform;
                 lblRt.anchorMin = Vector2.zero;
                 lblRt.anchorMax = new Vector2(1f, 1f);
                 lblRt.offsetMin = new Vector2(PAD, 0f);
                 lblRt.offsetMax = new Vector2(-(FLAG_ICON_SIZE + PAD * 2f), 0f);
-                var t = lbl.AddComponent<Text>();
-                t.text = code;
-                t.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-                t.fontSize = FS_SM;
-                t.color = isSelected ? WHITE : new Color(1f, 1f, 1f, 0.7f);
-                t.alignment = TextAnchor.MiddleLeft;
 
                 Sprite flagSpr = FlagAssets.LoadFlag(code);
                 if (flagSpr != null)

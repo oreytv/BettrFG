@@ -29,6 +29,9 @@ namespace BetterFG.Tweaks
         private Image _targetImg;
         private Sprite _originalSprite;
         private Sprite _customSprite;
+        // true while _targetTex holds our bytes, DisableTweak rewrites it so the fast reapply
+        // path must not skip the full pass after an off/on cycle
+        private bool _texApplied;
 
         public override List<TweakButton> GetCustomButtons() => new List<TweakButton>
         {
@@ -56,6 +59,7 @@ namespace BetterFG.Tweaks
                 if (sprite.name != "UI_S11_Logo_Splash") continue;
                 _targetTex = sprite.texture;
                 _targetTex.LoadImage(bytes);
+                _texApplied = true;
                 break;
             }
             foreach (var img in Resources.FindObjectsOfTypeAll<Image>())
@@ -70,6 +74,15 @@ namespace BetterFG.Tweaks
 
         public override void EnableTweak()
         {
+            // reapply path (title screen OnEnable re-runs this): targets from the first sweep still
+            // alive means the texture still holds our bytes, only the Image's sprite gets stomped —
+            // re-assert it and skip the two whole-heap scans + the file re-read
+            if (_texApplied && _customSprite != null && _targetImg != null && _targetTex != null)
+            {
+                _targetImg.sprite = _customSprite;
+                return;
+            }
+
             var bytes = LoadBytes();
             if (bytes == null) return;
 
@@ -80,6 +93,7 @@ namespace BetterFG.Tweaks
                 if (sprite.name != "UI_S11_Logo_Splash") continue;
                 _targetTex = sprite.texture;
                 _targetTex.LoadImage(bytes);
+                _texApplied = true;
                 break;
             }
 
@@ -99,6 +113,7 @@ namespace BetterFG.Tweaks
                 _targetImg.sprite = _originalSprite;
             if (_targetTex != null && _originalSprite != null)
                 _targetTex.LoadImage(GetEmbeddedBytes() ?? new byte[0]);
+            _texApplied = false;
         }
 
         private byte[] LoadBytes()

@@ -97,6 +97,7 @@ namespace BetterFG.UI.SideWheel
             _canvasGroup.alpha = show ? 1f : 0f;
             _canvasGroup.blocksRaycasts = show;
             _canvasGroup.interactable = show;
+            if (_canvas != null) _canvas.enabled = show;
             if (!visible)
             {
                 CloseWindow();
@@ -139,6 +140,7 @@ namespace BetterFG.UI.SideWheel
             _canvasGroup.alpha = visible ? 1f : 0f;
             _canvasGroup.blocksRaycasts = visible;
             _canvasGroup.interactable = visible;
+            if (_canvas != null) _canvas.enabled = visible;
             if (!visible)
             {
                 CloseWindow();
@@ -186,10 +188,16 @@ namespace BetterFG.UI.SideWheel
                 || go.GetComponent<TMPro.TMP_InputField>() != null;
         }
 
+        private float _apDiameter = -1f, _apPeek;
+
         private void ApplyRuntimeLayout()
         {
-            if (_wheelRt != null)
+            // only touch the rect when the tunables actually moved, re-writing the same values every
+            // frame dirties the canvas for nothing. UpdateShape already dedupes internally
+            if (_wheelRt != null && (_apDiameter != RingDiameter || _apPeek != PeekAmount))
             {
+                _apDiameter = RingDiameter;
+                _apPeek = PeekAmount;
                 _wheelRt.anchoredPosition = new Vector2(-(RingDiameter * 0.5f) + PeekAmount, 0f);
                 _wheelRt.sizeDelta = new Vector2(RingDiameter, RingDiameter);
             }

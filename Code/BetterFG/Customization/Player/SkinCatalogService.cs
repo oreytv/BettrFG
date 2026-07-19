@@ -136,6 +136,14 @@ namespace BetterFG.Customization.Player
 
             List<string> paths = ParseCatalog(catReq.downloadHandler.text);
             catReq.Dispose();
+            // drop category-only entries ("Costumes" with no subfolder) — those are type folders, not
+            // skins, so counting them inflates the total (e.g. 10 skins -> 10/15) and they only 404 on
+            // info.json without ever becoming a row
+            paths.RemoveAll((System.Predicate<string>)(p =>
+            {
+                string[] seg = p.Split('/');
+                return seg.Length < 2 || string.IsNullOrEmpty(seg[1]);
+            }));
             _catalogTotal += paths.Count;
             _catalogTotalByRepo[repoRaw] = paths.Count;
 

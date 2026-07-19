@@ -265,27 +265,17 @@ namespace BetterFG.UI
         private static void AddLabel(RectTransform parent, string text, int fs, Color color,
             Vector2 offsetMin, Vector2 offsetMax, TextAnchor anchor, FontStyle style)
         {
-            var go = new GameObject("Label");
-            go.transform.SetParent(parent, false);
-            var rt = go.AddComponent<RectTransform>();
+            var t = UGUIShip.CreateLabel(parent, default, text, fs, color, anchor);
+            t.fontStyle = style;
+            var rt = t.rectTransform;
             rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
             rt.offsetMin = offsetMin; rt.offsetMax = offsetMax;
-            var t = go.AddComponent<Text>();
-            t.text = text;
-            t.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            t.fontSize = fs; t.color = color; t.alignment = anchor; t.fontStyle = style;
         }
 
         private static void AddFlowLabel(Transform parent, string text, int fs, Color color)
         {
-            var go = new GameObject("Line");
-            go.transform.SetParent(parent, false);
-            go.AddComponent<RectTransform>();
-            go.AddComponent<LayoutElement>().preferredHeight = fs + 4f;
-            var t = go.AddComponent<Text>();
-            t.text = text;
-            t.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            t.fontSize = fs; t.color = color; t.alignment = TextAnchor.MiddleLeft;
+            var t = UGUIShip.CreateFlowLabel(parent, text, fs, color);
+            t.GetComponent<LayoutElement>().preferredHeight = fs + 4f;
         }
     }
 }

@@ -378,24 +378,10 @@ namespace BetterFG.UI
             float x, float topY, float height, float width,
             int fs, Color color, FontStyle style, TextAnchor anchor)
         {
-            var go = new GameObject("Label");
-            go.transform.SetParent(parent, false);
-            var rt = go.AddComponent<RectTransform>();
-            rt.anchorMin = new Vector2(0f, 1f);
-            rt.anchorMax = new Vector2(0f, 1f);
-            rt.pivot = new Vector2(0f, 1f);
-            rt.anchoredPosition = new Vector2(x, -topY);
-            rt.sizeDelta = new Vector2(width, height);
-
-            var t = go.AddComponent<Text>();
-            t.text = text;
-            t.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            t.fontSize = fs;
-            t.color = color;
-            t.alignment = anchor;
+            var t = UGUIShip.CreateLabel(parent, new Rect(x, topY, width, height), text, fs, color, anchor);
             t.fontStyle = style;
             t.horizontalOverflow = HorizontalWrapMode.Overflow;
-            return go;
+            return t.gameObject;
         }
 
         private void DontShowAgain()

@@ -531,22 +531,12 @@ namespace BetterFG.UI.Tab
             float timeW = 80f;
             var t = TimeSpan.FromSeconds(time);
             string timeStr = string.Format("{0:D2}:{1:D2}.{2:D3}", t.Minutes, t.Seconds, t.Milliseconds);
-            var timeGo = new GameObject("Time");
-            timeGo.transform.SetParent(rowGo.transform, false);
-            var tRt = timeGo.AddComponent<RectTransform>();
-            tRt.anchorMin = new Vector2(1f, 1f);
-            tRt.anchorMax = new Vector2(1f, 1f);
-            tRt.pivot = new Vector2(1f, 1f);
-            tRt.anchoredPosition = new Vector2(-(starW + delW + 8f), -3f);
-            tRt.sizeDelta = new Vector2(timeW, FS + 4f);
-            var tTxt = timeGo.AddComponent<Text>();
-            tTxt.text = timeStr;
-            tTxt.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            tTxt.fontSize = FS;
-            tTxt.color = TIME_COL;
-            tTxt.alignment = TextAnchor.UpperRight;
+            var tTxt = UGUIShip.CreateLabel(rowGo.transform, new Rect(0f, 0f, timeW, FS + 4f),
+                timeStr, FS, TIME_COL, TextAnchor.UpperRight);
             tTxt.horizontalOverflow = HorizontalWrapMode.Overflow;
-            tTxt.raycastTarget = false;
+            var tRt = tTxt.rectTransform;
+            tRt.anchorMin = tRt.anchorMax = tRt.pivot = new Vector2(1f, 1f);
+            tRt.anchoredPosition = new Vector2(-(starW + delW + 8f), -3f);
             timeTxtOut = tTxt;
 
             // ugc/creative share code, pulled out of the raw id (e.g. "...ugc-1234_5678" -> "1234")
@@ -571,23 +561,13 @@ namespace BetterFG.UI.Tab
             string rowDate = row.DateFor(_subType);
             if (!string.IsNullOrEmpty(rowDate))
             {
-                var dateGo = new GameObject("Date");
-                dateGo.transform.SetParent(rowGo.transform, false);
-                var dRt2 = dateGo.AddComponent<RectTransform>();
-                dRt2.anchorMin = new Vector2(0f, 1f);
-                dRt2.anchorMax = new Vector2(0f, 1f);
-                dRt2.pivot = new Vector2(0f, 1f);
-                dRt2.anchoredPosition = new Vector2(textX, -3f);
-                dRt2.sizeDelta = new Vector2(textW, FS_SM);
-                var dTxt = dateGo.AddComponent<Text>();
-                dTxt.text = FormatDateForDisplay(rowDate);
-                dTxt.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-                dTxt.fontSize = FS_SM - 2;
-                dTxt.color = new Color(1f, 1f, 1f, 0.4f);
-                dTxt.alignment = TextAnchor.UpperLeft;
+                var dTxt = UGUIShip.CreateLabel(rowGo.transform, new Rect(0f, 0f, textW, FS_SM),
+                    FormatDateForDisplay(rowDate), FS_SM - 2, new Color(1f, 1f, 1f, 0.4f), TextAnchor.UpperLeft);
                 dTxt.horizontalOverflow = HorizontalWrapMode.Overflow;
                 dTxt.verticalOverflow = VerticalWrapMode.Truncate;
-                dTxt.raycastTarget = false;
+                var dRt2 = dTxt.rectTransform;
+                dRt2.anchorMin = dRt2.anchorMax = dRt2.pivot = new Vector2(0f, 1f);
+                dRt2.anchoredPosition = new Vector2(textX, -3f);
             }
 
             // masked container at the column width; RectMask2D clips DESCENDANT graphics, so the
@@ -603,44 +583,26 @@ namespace BetterFG.UI.Tab
             nmRt.sizeDelta = new Vector2(textW, FS_SM + 4f);
             nameMask.AddComponent<RectMask2D>();
 
-            var nameGo = new GameObject("Name");
-            nameGo.transform.SetParent(nameMask.transform, false);
-            var nRt = nameGo.AddComponent<RectTransform>();
+            // wider than the mask so a long name overflows to the right and gets clipped
+            var nTxt = UGUIShip.CreateLabel(nameMask.transform, new Rect(0f, 0f, textW + 400f, 0f),
+                name, FS_SM, hasGhost ? GHOST_COL : Color.white, TextAnchor.LowerLeft);
+            nTxt.horizontalOverflow = HorizontalWrapMode.Overflow;
+            nTxt.verticalOverflow = VerticalWrapMode.Overflow;
+            var nRt = nTxt.rectTransform;
             nRt.anchorMin = new Vector2(0f, 0f);
             nRt.anchorMax = new Vector2(0f, 1f);
             nRt.pivot = new Vector2(0f, 0f);
             nRt.anchoredPosition = Vector2.zero;
-            // wider than the mask so a long name overflows to the right and gets clipped
-            nRt.sizeDelta = new Vector2(textW + 400f, 0f);
-            var nTxt = nameGo.AddComponent<Text>();
-            nTxt.text = name;
-            nTxt.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            nTxt.fontSize = FS_SM;
-            nTxt.color = hasGhost ? GHOST_COL : Color.white;
-            nTxt.alignment = TextAnchor.LowerLeft;
-            nTxt.horizontalOverflow = HorizontalWrapMode.Overflow;
-            nTxt.verticalOverflow = VerticalWrapMode.Overflow;
-            nTxt.raycastTarget = false;
 
             if (ugcCode != null)
             {
-                var codeGo = new GameObject("Code");
-                codeGo.transform.SetParent(rowGo.transform, false);
-                var cRt = codeGo.AddComponent<RectTransform>();
-                cRt.anchorMin = new Vector2(0f, 0f);
-                cRt.anchorMax = new Vector2(0f, 0f);
-                cRt.pivot = new Vector2(0f, 0f);
-                cRt.anchoredPosition = new Vector2(textX, 3f + FS_SM + 3f);
-                cRt.sizeDelta = new Vector2(textW, FS_SM);
-                var cTxt = codeGo.AddComponent<Text>();
-                cTxt.text = ugcCode;
-                cTxt.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-                cTxt.fontSize = FS_SM - 2;
-                cTxt.color = new Color(1f, 1f, 1f, 0.4f);
-                cTxt.alignment = TextAnchor.LowerLeft;
+                var cTxt = UGUIShip.CreateLabel(rowGo.transform, new Rect(0f, 0f, textW, FS_SM),
+                    ugcCode, FS_SM - 2, new Color(1f, 1f, 1f, 0.4f), TextAnchor.LowerLeft);
                 cTxt.horizontalOverflow = HorizontalWrapMode.Overflow;
                 cTxt.verticalOverflow = VerticalWrapMode.Truncate;
-                cTxt.raycastTarget = false;
+                var cRt = cTxt.rectTransform;
+                cRt.anchorMin = cRt.anchorMax = cRt.pivot = new Vector2(0f, 0f);
+                cRt.anchoredPosition = new Vector2(textX, 3f + FS_SM + 3f);
             }
 
             // favorite star — same sprites the popup uses, toggles on click

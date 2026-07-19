@@ -325,6 +325,24 @@ namespace BetterFG.UI
 
         }
 
+        // Forward mouse-wheel scroll from this element up to the enclosing ScrollRect. UGUI routes a
+        // scroll to the first ancestor implementing IScrollHandler; the EventTrigger we add for hover
+        // /audio implements it, so it swallows the wheel and the list freezes while the pointer is over
+        // a button. Handing the scroll back to the ScrollRect makes lists scroll no matter what's hovered.
+        public static void ForwardScrollToParent(GameObject go)
+        {
+            if (go == null) return;
+            var trigger = go.GetComponent<EventTrigger>() ?? go.AddComponent<EventTrigger>();
+            var scroll = new EventTrigger.Entry { eventID = EventTriggerType.Scroll };
+            scroll.callback.AddListener(new Action<BaseEventData>(data =>
+            {
+                var sr = go.GetComponentInParent<ScrollRect>();
+                var ped = data?.TryCast<PointerEventData>();
+                if (sr != null && ped != null) sr.OnScroll(ped);
+            }));
+            trigger.triggers.Add(scroll);
+        }
+
         private static void AddButtonClick(Button btn, Action onClick)
         {
             btn.onClick.AddListener(new Action(() =>
@@ -377,6 +395,7 @@ namespace BetterFG.UI
             }
 
             WireButtonAudio(go, skipHoverSound);
+            ForwardScrollToParent(go);
 
             CreateLabel(go.transform,
                 new Rect(0, 0, rect.width, rect.height),
@@ -698,6 +717,7 @@ namespace BetterFG.UI
             }
 
             WireButtonAudio(go, skipHoverSound);
+            ForwardScrollToParent(go);
 
             var lblGo = new GameObject("Label");
             lblGo.transform.SetParent(go.transform, false);
@@ -1067,19 +1087,31 @@ namespace BetterFG.UI
         }
 
         // �� Flow label (inside vertical layout groups) ������������������������
-        public static Text CreateFlowLabel(Transform parent, string text, int fontSize, Color color)
+        public static Text CreateFlowLabel(Transform parent, string text, int fontSize, Color color, bool multiline = false)
         {
             var go = new GameObject("Label");
             go.transform.SetParent(parent, false);
             go.AddComponent<RectTransform>();
-            go.AddComponent<LayoutElement>().preferredHeight = fontSize + 2f;
+            var le = go.AddComponent<LayoutElement>();
             var t = go.AddComponent<Text>();
             t.text = text;
             t.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
             t.fontSize = fontSize;
             t.color = color;
-            t.alignment = TextAnchor.MiddleLeft;
             t.raycastTarget = false;
+            if (multiline)
+            {
+                // grow the rect downward to fit every wrapped line instead of clipping to one
+                le.minHeight = fontSize + 2f;
+                t.alignment = TextAnchor.UpperLeft;
+                t.horizontalOverflow = HorizontalWrapMode.Wrap;
+                t.verticalOverflow = VerticalWrapMode.Overflow;
+            }
+            else
+            {
+                le.preferredHeight = fontSize + 2f;
+                t.alignment = TextAnchor.MiddleLeft;
+            }
             return t;
         }
 
