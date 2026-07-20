@@ -202,12 +202,9 @@ namespace BetterFG.UI.Tab
 
         // ── Repo dropdown ─────────────────────────────────────────────────────
         private RectTransform _repoRowsParent;
-        private string _pendingRepoInput = ""; // Pending repository input
-        private bool _repoInputActive = false;
-        private Text _repoInputTextRef;
-        private RectTransform _repoInputRt;
-        private Text _repoInputPh;
         private bool _repoDropdownOpen = false;
+        private string _repoSearchQuery = "";     // filters the open repo list
+        private InputField _repoSearchField;      // real search bar shown in place of the header while open
         private bool _fakeInputLocked = false;
         private GameObject _belowRepos; // everything under the repo section, hidden while the dropdown is open
 
@@ -337,65 +334,29 @@ namespace BetterFG.UI.Tab
         {
             WinDialogs.Tick();
 
-            bool anyActive = _searchActive || _repoInputActive;
-            SetFakeInputLock(anyActive);
-            if (!anyActive) return;
+            SetFakeInputLock(_searchActive);
+            if (!_searchActive) return;
 
             if (Input.GetMouseButtonDown(0))
             {
                 var mousePos = new Vector2(Input.mousePosition.x, Input.mousePosition.y);
-
-                if (_searchActive && _searchFieldRt != null &&
+                if (_searchFieldRt != null &&
                     !RectTransformUtility.RectangleContainsScreenPoint(_searchFieldRt, mousePos, null))
                 {
                     _searchActive = false;
                     UpdateSearchCaret();
                 }
-
-                if (_repoInputActive && _repoInputRt != null &&
-                    !RectTransformUtility.RectangleContainsScreenPoint(_repoInputRt, mousePos, null))
-                {
-                    _repoInputActive = false;
-                    UpdateRepoInputCaret();
-                }
-
                 return;
-            }
-
-            // allow paste even when no characters are in Input.inputString
-            if (_repoInputActive && (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)) && Input.GetKeyDown(KeyCode.V))
-            {
-                try { _pendingRepoInput += GUIUtility.systemCopyBuffer; UpdateRepoInputCaret(); }
-                catch { }
             }
 
             foreach (char c in Input.inputString)
             {
-                if (_searchActive)
-                {
-                    if (c == '\b')
-                    { if (_searchQuery.Length > 0) { _searchQuery = _searchQuery.Substring(0, _searchQuery.Length - 1); RefreshSkinList(); } }
-                    else if (c == '\n' || c == '\r' || c == '\x1b') { _searchActive = false; }
-                    else { _searchQuery += c; RefreshSkinList(); }
-                    UpdateSearchCaret();
-                }
-                else if (_repoInputActive)
-                {
-                    if (c == '\b')
-                    { if (_pendingRepoInput.Length > 0) { _pendingRepoInput = _pendingRepoInput.Substring(0, _pendingRepoInput.Length - 1); UpdateRepoInputCaret(); } }
-                    else if (c == '\x1b') { _repoInputActive = false; UpdateRepoInputCaret(); }
-                    else if (c != '\n' && c != '\r') { _pendingRepoInput += c; UpdateRepoInputCaret(); }
-                }
+                if (c == '\b')
+                { if (_searchQuery.Length > 0) { _searchQuery = _searchQuery.Substring(0, _searchQuery.Length - 1); RefreshSkinList(); } }
+                else if (c == '\n' || c == '\r' || c == '\x1b') { _searchActive = false; }
+                else { _searchQuery += c; RefreshSkinList(); }
+                UpdateSearchCaret();
             }
-        }
-
-        private void UpdateRepoInputCaret()
-        {
-            if (_repoInputTextRef == null) return;
-            _repoInputTextRef.text = _pendingRepoInput + (_repoInputActive ? "|" : "");
-            if (_repoInputPh != null)
-                _repoInputPh.color = string.IsNullOrEmpty(_pendingRepoInput) && !_repoInputActive
-                    ? new Color(1f, 1f, 1f, 0.2f) : new Color(1f, 1f, 1f, 0f);
         }
 
         private void UpdateSearchCaret()
@@ -554,124 +515,119 @@ namespace BetterFG.UI.Tab
             aHlg.spacing = 3f;
             aHlg.padding = new RectOffset(0, 0, 0, 0);
 
-            // Create left button via UGUIShip so shine + hover works, and left-align label
-            string activeLabelText = _featuredSelected
-                ? "Featured Repos (selected)"
-                : _importedRepoSelected
-                    ? "Imported Skins (selected)"
-                    : activeRepo != null ? activeRepo.DisplayName + " (selected)" : "No repository";
-            Color activeLabelColor = _featuredSelected ? GOLD
-                : _importedRepoSelected ? ORANGE
-                : activeRepo != null ? YELLOW : HINT;
-            var nameBtn = UGUIShip.CreateButton(activeGo.transform, activeLabelText,
-                BTN_DARK, activeLabelColor, FS_SM, new Action(() => { _repoDropdownOpen = !_repoDropdownOpen; RefreshRepoRows(); }));
-            var nameLbl = nameBtn.transform.Find("Label")?.GetComponent<Text>();
-            if (nameLbl != null)
+            if (_repoDropdownOpen)
             {
-                nameLbl.alignment = TextAnchor.MiddleLeft;
-                nameLbl.color = activeLabelColor;
-                var nameLblRt = nameLbl.GetComponent<RectTransform>();
-                if (nameLblRt != null) nameLblRt.offsetMin = new Vector2(14f, nameLblRt.offsetMin.y);
+                // while open, the header is a live search bar that filters the list below
+                _repoSearchField = UGUIShip.CreateInputField(activeGo.transform, new Rect(0f, 0f, 100f, BTN_H),
+                    "search repositories...", new Color(0f, 0f, 0f, 0.4f), WHITE, FS_SM);
+                _repoSearchField.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
+                UGUIShip.SetInputText(_repoSearchField, _repoSearchQuery, false);
+                _repoSearchField.onValueChanged.AddListener(new Action<string>(val =>
+                {
+                    _repoSearchQuery = val ?? "";
+                    if (_repoScrollContent != null)
+                    {
+                        PopulateRepoEntries(_repoScrollContent);
+                        LayoutRebuilder.ForceRebuildLayoutImmediate(_repoScrollContent);
+                    }
+                }));
             }
-            var nameLE = nameBtn.gameObject.GetComponent<LayoutElement>() ?? nameBtn.gameObject.AddComponent<LayoutElement>();
-            nameLE.flexibleWidth = 1f;
-
-            // cover stretches behind the name button only (not shown for imported repo)
-            var activeCoverGo = new GameObject("RepoCover");
-            activeCoverGo.transform.SetParent(nameBtn.transform, false);
-            activeCoverGo.transform.SetAsFirstSibling();
-            var activeCoverRt = activeCoverGo.AddComponent<RectTransform>();
-            activeCoverRt.anchorMin = Vector2.zero;
-            activeCoverRt.anchorMax = Vector2.one;
-            activeCoverRt.offsetMin = activeCoverRt.offsetMax = Vector2.zero;
-            var activeCoverImg = activeCoverGo.AddComponent<RawImage>();
-            activeCoverImg.color = new Color(1f, 1f, 1f, 0f);
-            activeCoverImg.raycastTarget = false;
-            if (!_importedRepoSelected && !_featuredSelected && activeRepo != null)
+            else
             {
-                _repoCoverImages[activeRepo.githubUrl] = activeCoverImg;
-                var cachedTex = repoRegistry.GetCover(activeRepo);
-                if (cachedTex != null) { activeCoverImg.texture = cachedTex; activeCoverImg.color = Color.white; }
-                else repoRegistry.FetchCover(activeRepo);
+                // Create left button via UGUIShip so shine + hover works, and left-align label
+                string activeLabelText = _featuredSelected
+                    ? "Featured Repositories (selected)"
+                    : _importedRepoSelected
+                        ? "Imported Skins (selected)"
+                        : activeRepo != null ? activeRepo.DisplayName + " (selected)" : "No repository";
+                Color activeLabelColor = _featuredSelected ? GOLD
+                    : _importedRepoSelected ? ORANGE
+                    : activeRepo != null ? YELLOW : HINT;
+                var nameBtn = UGUIShip.CreateButton(activeGo.transform, activeLabelText,
+                    BTN_DARK, activeLabelColor, FS_SM, new Action(() => { _repoDropdownOpen = true; _repoSearchQuery = ""; RefreshRepoRows(); }));
+                var nameLbl = nameBtn.transform.Find("Label")?.GetComponent<Text>();
+                if (nameLbl != null)
+                {
+                    nameLbl.alignment = TextAnchor.MiddleLeft;
+                    nameLbl.color = activeLabelColor;
+                    var nameLblRt = nameLbl.GetComponent<RectTransform>();
+                    if (nameLblRt != null) nameLblRt.offsetMin = new Vector2(14f, nameLblRt.offsetMin.y);
+                }
+                var nameLE = nameBtn.gameObject.GetComponent<LayoutElement>() ?? nameBtn.gameObject.AddComponent<LayoutElement>();
+                nameLE.flexibleWidth = 1f;
+
+                // cover stretches behind the name button only (not shown for imported repo)
+                var activeCoverGo = new GameObject("RepoCover");
+                activeCoverGo.transform.SetParent(nameBtn.transform, false);
+                activeCoverGo.transform.SetAsFirstSibling();
+                var activeCoverRt = activeCoverGo.AddComponent<RectTransform>();
+                activeCoverRt.anchorMin = Vector2.zero;
+                activeCoverRt.anchorMax = Vector2.one;
+                activeCoverRt.offsetMin = activeCoverRt.offsetMax = Vector2.zero;
+                var activeCoverImg = activeCoverGo.AddComponent<RawImage>();
+                activeCoverImg.color = new Color(1f, 1f, 1f, 0f);
+                activeCoverImg.raycastTarget = false;
+                if (!_importedRepoSelected && !_featuredSelected && activeRepo != null)
+                {
+                    _repoCoverImages[activeRepo.githubUrl] = activeCoverImg;
+                    var cachedTex = repoRegistry.GetCover(activeRepo);
+                    if (cachedTex != null) { activeCoverImg.texture = cachedTex; activeCoverImg.color = Color.white; }
+                    else repoRegistry.FetchCover(activeRepo);
+                }
             }
 
             // caret button on right (small)
-            var caretBtn = UGUIShip.CreateButton(activeGo.transform, _repoDropdownOpen ? "▴" : "▾", BTN_DARK, CYAN, FS_SM, new Action(() => { _repoDropdownOpen = !_repoDropdownOpen; RefreshRepoRows(); }));
+            var caretBtn = UGUIShip.CreateButton(activeGo.transform, _repoDropdownOpen ? "▴" : "▾", BTN_DARK, CYAN, FS_SM, new Action(() => { _repoDropdownOpen = !_repoDropdownOpen; _repoSearchQuery = ""; RefreshRepoRows(); }));
             caretBtn.gameObject.AddComponent<LayoutElement>().preferredWidth = BTN_H;
 
-            // if dropdown open, render other repos in a scrollview (max 5 visible), Add button below
+            // if dropdown open: pinned entries stay fixed at the top, only the added repos scroll
             if (_repoDropdownOpen)
             {
-                // count selectable entries: non-active repos + the Featured/Imported entries.
-                // while a special section (Featured/Imported) is active the real active repo has no
-                // "(selected)" header row, so list it here too — otherwise you couldn't switch back to it
-                bool specialSelected = _importedRepoSelected || _featuredSelected;
-                int entryCount = 0;
+                // pinned system entries, fixed order, never scroll: default repo, Imported, Featured
+                SkinRepo defaultRepo = null;
                 foreach (var repo in repoRegistry.Repos)
-                    if (repo != activeRepo || specialSelected) entryCount++;
-                if (!_featuredSelected) entryCount++;
-                if (!_importedRepoSelected) entryCount++;
+                    if (repo.isDefault) { defaultRepo = repo; break; }
+                if (defaultRepo != null) BuildRepoEntryRow(_repoRowsParent, defaultRepo);
+                BuildImportedEntryRow(_repoRowsParent);
+                BuildFeaturedEntryRow(_repoRowsParent);
 
-                // grow the open list so the dropdown visually covers the whole content area below it
-                // (header + this scroll + Add button span from the top down to the bottom margin)
-                float viewportH = TabHeight - VPAD * 2f - BTN_H * 2f - 6f;
-                if (viewportH < BTN_H) viewportH = BTN_H;
+                bool anyAdded = false;
+                foreach (var repo in repoRegistry.Repos)
+                    if (!repo.isDefault) { anyAdded = true; break; }
 
-                if (entryCount > 0)
+                if (anyAdded)
                 {
-                    var scrollGo = new GameObject("RepoScroll");
-                    scrollGo.transform.SetParent(_repoRowsParent, false);
-                    scrollGo.AddComponent<RectTransform>();
-                    var scrollLE = scrollGo.AddComponent<LayoutElement>();
-                    scrollLE.preferredHeight = viewportH;
-                    scrollLE.minHeight = viewportH;
-                    var scrollRect = scrollGo.AddComponent<ScrollRect>();
-                    scrollRect.vertical = true;
-                    scrollRect.horizontal = false;
-                    scrollRect.scrollSensitivity = 24f;
-                    scrollRect.movementType = ScrollRect.MovementType.Clamped;
+                    // fixed section header — sits tight above the scroll, aligned to the row's left edge
+                    var secGo = new GameObject("RepoSectionLabel");
+                    secGo.transform.SetParent(_repoRowsParent, false);
+                    secGo.AddComponent<RectTransform>();
+                    secGo.AddComponent<LayoutElement>().preferredHeight = FS + 18f;
+                    var secLbl = UGUIShip.CreateStretchLabel(secGo.transform, "Added repositories", FS, WHITE);
+                    secLbl.alignment = TextAnchor.LowerLeft;
+                    var secLblRt = secLbl.GetComponent<RectTransform>();
+                    secLblRt.offsetMin = new Vector2(14f, secLblRt.offsetMin.y);
 
-                    var viewGo = new GameObject("Viewport");
-                    viewGo.transform.SetParent(scrollGo.transform, false);
-                    var viewRt = viewGo.AddComponent<RectTransform>();
-                    viewRt.anchorMin = Vector2.zero; viewRt.anchorMax = Vector2.one;
-                    viewRt.offsetMin = viewRt.offsetMax = Vector2.zero;
-                    viewGo.AddComponent<RectMask2D>();
-                    // invisible raycast target so scroll-drag is captured over empty gaps
-                    var viewImg = viewGo.AddComponent<Image>();
-                    viewImg.color = Color.clear;
+                    // the one scrollable area — fills what's left under the fixed rows and above the Add button
+                    float viewportH = TabHeight - VPAD * 2f - BTN_H * 5f - (FS + 18f) - 30f;
+                    if (viewportH < BTN_H * 2f) viewportH = BTN_H * 2f;
 
-                    var contentGo = new GameObject("Content");
-                    contentGo.transform.SetParent(viewGo.transform, false);
-                    var contentRt = contentGo.AddComponent<RectTransform>();
-                    contentRt.anchorMin = new Vector2(0f, 1f);
-                    contentRt.anchorMax = new Vector2(1f, 1f);
-                    contentRt.pivot = new Vector2(0.5f, 1f);
-                    contentRt.sizeDelta = Vector2.zero;
-                    var cVlg = contentGo.AddComponent<VerticalLayoutGroup>();
+                    var scroll = UGUIShip.CreateScrollView(_repoRowsParent, new Rect(0f, 0f, 100f, viewportH));
+                    scroll.scrollRect.scrollSensitivity = 24f;
+                    scroll.scrollRect.gameObject.AddComponent<LayoutElement>().preferredHeight = viewportH;
+                    // drop the viewport's left inset so the added rows line up with the label/pinned rows above
+                    var vp = scroll.scrollRect.viewport;
+                    if (vp != null) vp.offsetMin = new Vector2(0f, vp.offsetMin.y);
+
+                    var cVlg = scroll.content.gameObject.AddComponent<VerticalLayoutGroup>();
                     cVlg.childControlWidth = true;
                     cVlg.childControlHeight = true;
                     cVlg.childForceExpandWidth = true;
                     cVlg.childForceExpandHeight = false;
-                    cVlg.spacing = 6f;
-                    contentGo.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+                    cVlg.spacing = 2f;
+                    scroll.content.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-                    scrollRect.viewport = viewRt;
-                    scrollRect.content = contentRt;
-
-                    foreach (var repo in repoRegistry.Repos)
-                    {
-                        if (repo == activeRepo && !specialSelected) continue;
-                        BuildRepoEntryRow(contentRt, repo);
-                    }
-
-                    if (!_featuredSelected)
-                        BuildFeaturedEntryRow(contentRt);
-
-                    if (!_importedRepoSelected)
-                        BuildImportedEntryRow(contentRt);
-
-                    _repoScrollContent = contentRt;
+                    _repoScrollContent = scroll.content;
+                    PopulateRepoEntries(scroll.content);
                 }
 
                 // Add button row — outside the scroll, always visible
@@ -686,10 +642,10 @@ namespace BetterFG.UI.Tab
                 addHlg.spacing = 3f;
                 addHlg.padding = new RectOffset(0, 0, 0, 0);
 
-                var addBtn = UGUIShip.CreateButton(addRow.transform, "+ Add",
+                var addBtn = UGUIShip.CreateButton(addRow.transform, "Add Repositories",
                     BTN_DARK, CYAN, FS_SM, new Action(OnAddRepo));
                 var addBtnLE = addBtn.gameObject.AddComponent<LayoutElement>();
-                addBtnLE.preferredWidth = 120f;
+                addBtnLE.preferredWidth = 180f;
                 addBtnLE.preferredHeight = BTN_H;
             }
 
@@ -710,6 +666,24 @@ namespace BetterFG.UI.Tab
             {
                 _belowRepos.SetActive(true);
                 _repoRowsParent.SetAsFirstSibling();
+            }
+        }
+
+        // fills the open dropdown's scroll content: default repo, Imported, Featured pinned at the top in
+        // fills the scrollable area with just the user-added repos, filtered by the search query. the
+        // pinned entries + section label are built as fixed rows outside the scroll, so typing only
+        // re-lists this content and never tears down the search field itself
+        private void PopulateRepoEntries(RectTransform contentRt)
+        {
+            for (int i = contentRt.childCount - 1; i >= 0; i--)
+                Destroy(contentRt.GetChild(i).gameObject);
+
+            string q = (_repoSearchQuery ?? "").Trim().ToLower();
+            foreach (var repo in repoRegistry.Repos)
+            {
+                if (repo.isDefault) continue;
+                if (q.Length > 0 && !repo.DisplayName.ToLower().Contains(q)) continue;
+                BuildRepoEntryRow(contentRt, repo);
             }
         }
 
@@ -814,7 +788,7 @@ namespace BetterFG.UI.Tab
             hlg.spacing = 3f;
             hlg.padding = new RectOffset(0, 0, 0, 0);
 
-            var btn = UGUIShip.CreateButton(rowGo.transform, "Featured Repos", BTN_DARK, GOLD, FS_SM, new Action(() =>
+            var btn = UGUIShip.CreateButton(rowGo.transform, "Featured Repositories", BTN_DARK, GOLD, FS_SM, new Action(() =>
             {
                 _featuredSelected = true;
                 _importedRepoSelected = false;
@@ -880,85 +854,48 @@ namespace BetterFG.UI.Tab
             if (_repoRowsParent == null) return;
             if (_repoRowsParent.Find("RepoInputRow") != null) return;
 
-            _pendingRepoInput = "";
-            _repoInputActive = true;
+            // swap the field in where the Add button sits (bottom) so there's no jump back to the top
+            var addRow = _repoRowsParent.Find("RepoAddRow");
+            int addIdx = addRow != null ? addRow.GetSiblingIndex() : _repoRowsParent.childCount;
+            if (addRow != null) addRow.gameObject.SetActive(false);
 
             var rowGo = new GameObject("RepoInputRow");
             rowGo.transform.SetParent(_repoRowsParent, false);
-            rowGo.transform.SetAsFirstSibling();
-            var rowRt = rowGo.AddComponent<RectTransform>();
-            rowRt.sizeDelta = new Vector2(0f, BTN_H);
+            rowGo.transform.SetSiblingIndex(addIdx);
+            rowGo.AddComponent<RectTransform>().sizeDelta = new Vector2(0f, BTN_H);
             var hlg = rowGo.AddComponent<HorizontalLayoutGroup>();
             hlg.childForceExpandHeight = true;
             hlg.childForceExpandWidth = false;
             hlg.spacing = 3f;
             rowGo.AddComponent<LayoutElement>().preferredHeight = BTN_H;
 
-            // clickable input field
-            var inputGo = new GameObject("RepoInputField");
-            inputGo.transform.SetParent(rowGo.transform, false);
-            inputGo.AddComponent<RectTransform>();
-            inputGo.AddComponent<Image>().color = new Color(0.08f, 0.08f, 0.08f, 1f);
-            inputGo.AddComponent<LayoutElement>().flexibleWidth = 1f;
-            _repoInputRt = inputGo.GetComponent<RectTransform>();
+            var field = UGUIShip.CreateInputField(rowGo.transform, new Rect(0f, 0f, 100f, BTN_H),
+                "https://github.com/author/repo", null, CYAN, FS_SM);
+            field.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
 
-            // placeholder
-            var ph = UGUIShip.CreateLabel(inputGo.transform, default, "https://github.com/author/repo",
-                FS_SM, new Color(1f, 1f, 1f, 0.2f), TextAnchor.MiddleLeft);
-            ph.fontStyle = FontStyle.Italic;
-            var phRt = ph.rectTransform;
-            phRt.anchorMin = Vector2.zero; phRt.anchorMax = Vector2.one;
-            phRt.offsetMin = new Vector2(4f, 0f); phRt.offsetMax = Vector2.zero;
-
-            // typed text
-            _repoInputTextRef = UGUIShip.CreateLabel(inputGo.transform, default, "|", FS_SM, CYAN, TextAnchor.MiddleLeft);
-            var txtRt = _repoInputTextRef.rectTransform;
-            txtRt.anchorMin = Vector2.zero; txtRt.anchorMax = Vector2.one;
-            txtRt.offsetMin = new Vector2(4f, 0f); txtRt.offsetMax = Vector2.zero;
-
-            // clicking the field focuses it
-            var clickArea = inputGo.AddComponent<Button>();
-            clickArea.transition = Selectable.Transition.None;
-            var clickNav = clickArea.navigation;
-            clickNav.mode = Navigation.Mode.None;
-            clickArea.navigation = clickNav;
-            clickArea.onClick.AddListener(new Action(() =>
+            Action commit = () =>
             {
-                _repoInputActive = true;
-                SetFakeInputLock(true);
-                UpdateRepoInputCaret();
-            }));
+                string url = (field.text ?? "").Trim();
+                if (addRow != null) addRow.gameObject.SetActive(true);
+                Destroy(rowGo);
+                if (!string.IsNullOrEmpty(url))
+                    repoRegistry?.AddRepo(url);
+            };
 
-            _repoInputPh = ph;
-
-            // OK button
             var ok = UGUIShip.CreateButton(rowGo.transform, "OK",
-                new Color(0.15f, 0.3f, 0.15f, 1f), GREEN, FS_SM, new Action(() =>
-                {
-                    string url = _pendingRepoInput.Trim();
-                    _repoInputActive = false;
-                    _repoInputRt = null;
-                    _repoInputTextRef = null;
-                    _repoInputPh = null;
-                    Destroy(rowGo);
-                    if (!string.IsNullOrEmpty(url))
-                        repoRegistry?.AddRepo(url);
-                }));
+                new Color(0.15f, 0.3f, 0.15f, 1f), GREEN, FS_SM, commit);
             ok.gameObject.AddComponent<LayoutElement>().preferredWidth = BTN_H * 1.5f;
 
-            // cancel
             var cancel = UGUIShip.CreateButton(rowGo.transform, "✕",
                 BTN_DARK, HINT, FS_SM, new Action(() =>
                 {
-                    _repoInputActive = false;
-                    _repoInputRt = null;
-                    _repoInputTextRef = null;
-                    _repoInputPh = null;
+                    if (addRow != null) addRow.gameObject.SetActive(true);
                     Destroy(rowGo);
                 }));
             cancel.gameObject.AddComponent<LayoutElement>().preferredWidth = BTN_H;
 
             LayoutRebuilder.ForceRebuildLayoutImmediate(_repoRowsParent);
+            field.ActivateInputField();
         }
 
         private void SaveImportedPaths()
@@ -1516,8 +1453,8 @@ namespace BetterFG.UI.Tab
             if (featured == null || featured.Count == 0)
             {
                 CreateFeaturedEmptyLabel(repoRegistry != null && repoRegistry.FeaturedFetched
-                    ? "No featured repos yet."
-                    : "Loading featured repos...");
+                    ? "No featured repositories yet."
+                    : "Loading featured repositories...");
                 return;
             }
 

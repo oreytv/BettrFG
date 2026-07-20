@@ -77,6 +77,14 @@ namespace BetterFG.UI.Tab
         private RectTransform _screenBodyParent;
         private float _screenBodyW, _screenBodyH;
 
+        // ── Creative (level browser) slot colours ─────────────────────────────
+        private bool _creativeSel;
+        private bool _crEnabled;
+        // r/g/b per slot, indexed by CreativeSlot (Backdrop, Glows, Drawings, Vignette)
+        private readonly float[] _crR = new float[4], _crG = new float[4], _crB = new float[4];
+        private readonly Image[] _crSwatch = new Image[4];
+        private Button _crEnabledBtn;
+
         // ── Falling screen (lobby bg) slot colours ────────────────────────────
         private bool _lbEnabled;
         private float _lbSlot0R, _lbSlot0G, _lbSlot0B;
@@ -597,25 +605,30 @@ namespace BetterFG.UI.Tab
             var opts = new System.Collections.Generic.List<string>();
             var initial = new System.Collections.Generic.List<bool>();
             var sprites = new System.Collections.Generic.List<Sprite>();
-            foreach (var s in screens) { opts.Add(ScreenBackgroundService.Label(s)); initial.Add(_fallingSel ? false : s == _screenSel); sprites.Add(ScreenSprite(s)); }
-            // falling screen (lobby bg) — the fifth entry
+            bool special = _fallingSel || _creativeSel;
+            foreach (var s in screens) { opts.Add(ScreenBackgroundService.Label(s)); initial.Add(!special && s == _screenSel); sprites.Add(ScreenSprite(s)); }
+            // special entries — not gradient screens, each has its own recolour body
             opts.Add("Falling Screen"); initial.Add(_fallingSel); sprites.Add(ScreenSpriteByName("fallingscreen"));
             int fallingIdx = screens.Count;
+            opts.Add("Creative"); initial.Add(_creativeSel); sprites.Add(ScreenSpriteByName("creative"));
+            int creativeIdx = fallingIdx + 1;
 
-            string HeaderLabel() => _fallingSel ? "Falling Screen" : ScreenBackgroundService.Label(_screenSel);
+            string HeaderLabel() => _creativeSel ? "Creative" : _fallingSel ? "Falling Screen" : ScreenBackgroundService.Label(_screenSel);
+            Sprite HeaderSprite() => _creativeSel ? ScreenSpriteByName("creative") : _fallingSel ? ScreenSpriteByName("fallingscreen") : ScreenSprite(_screenSel);
 
             Button screenDd = null;
             screenDd = UGUIShip.CreateMultiSelectDropdown(parent, new Rect(x, cy, w, BTN_H),
                 HeaderLabel(), opts, initial,
                 new Action<int, bool>((idx, _) =>
                 {
-                    if (idx < 0 || idx > fallingIdx) return;
+                    if (idx < 0 || idx > creativeIdx) return;
                     _fallingSel = idx == fallingIdx;
-                    if (!_fallingSel) _screenSel = screens[idx];
+                    _creativeSel = idx == creativeIdx;
+                    if (!_fallingSel && !_creativeSel) _screenSel = screens[idx];
                     var lbl = screenDd?.GetComponentInChildren<Text>();
                     if (lbl != null) lbl.text = HeaderLabel();
                     var headImg = screenDd?.transform.Find("HeaderImg")?.GetComponent<Image>();
-                    if (headImg != null) headImg.sprite = _fallingSel ? ScreenSpriteByName("fallingscreen") : ScreenSprite(_screenSel);
+                    if (headImg != null) headImg.sprite = HeaderSprite();
                     RebuildScreenBody();
                 }), FS_SM, w, dropdownRowH, true, true, false, sprites, true);
             cy += BTN_H + SH;
@@ -633,7 +646,9 @@ namespace BetterFG.UI.Tab
             _screenBodyGo.transform.SetParent(parent, false);
             var bodyRt = _screenBodyGo.AddComponent<RectTransform>();
             UGUIShip.SetPixelRect(bodyRt, new Rect(0f, bodyY, TabWidth, _screenBodyH));
-            BuildScreenBody(bodyRt, x, 0f, w, _screenBodyH);
+            if (_creativeSel) { LoadCreativeSettings(); BuildCreativeBody(bodyRt, x, 0f, w, _screenBodyH); }
+            else if (_fallingSel) { LoadFallingSettings(); BuildFallingBody(bodyRt, x, 0f, w, _screenBodyH); }
+            else BuildScreenBody(bodyRt, x, 0f, w, _screenBodyH);
 
             // apply / remove row pinned at the bottom
             float by = y + bodyH + PAD;
@@ -641,22 +656,23 @@ namespace BetterFG.UI.Tab
             by += 1f + PAD;
             float btnw = (w - PAD * 0.5f) / 2f;
             UGUIShip.CreateButton(parent, new Rect(PAD, by, btnw, BTN_H),
-                "Apply", BTN_APPLY, WHITE, FS, new Action(() => { if (_fallingSel) OnFallingApply(); else OnScreenApply(); }));
+                "Apply", BTN_APPLY, WHITE, FS, new Action(() => { if (_creativeSel) OnCreativeApply(); else if (_fallingSel) OnFallingApply(); else OnScreenApply(); }));
             UGUIShip.CreateButton(parent, new Rect(PAD + btnw + PAD * 0.5f, by, btnw, BTN_H),
-                "Remove", BTN_REMOVE, WHITE, FS, new Action(() => { if (_fallingSel) OnFallingRemove(); else OnScreenRemove(); }));
+                "Remove", BTN_REMOVE, WHITE, FS, new Action(() => { if (_creativeSel) OnCreativeRemove(); else if (_fallingSel) OnFallingRemove(); else OnScreenRemove(); }));
         }
 
         private void RebuildScreenBody()
         {
             if (_screenBodyGo == null) return;
-            if (_fallingSel) LoadFallingSettings();
+            if (_creativeSel) LoadCreativeSettings();
+            else if (_fallingSel) LoadFallingSettings();
             else LoadScreenSettings(_screenSel);
             for (int i = _screenBodyGo.transform.childCount - 1; i >= 0; i--)
                 GameObject.Destroy(_screenBodyGo.transform.GetChild(i).gameObject);
-            if (_fallingSel)
-                BuildFallingBody(_screenBodyGo.GetComponent<RectTransform>(), PAD, 0f, _screenBodyW, _screenBodyH);
-            else
-                BuildScreenBody(_screenBodyGo.GetComponent<RectTransform>(), PAD, 0f, _screenBodyW, _screenBodyH);
+            var rt = _screenBodyGo.GetComponent<RectTransform>();
+            if (_creativeSel) BuildCreativeBody(rt, PAD, 0f, _screenBodyW, _screenBodyH);
+            else if (_fallingSel) BuildFallingBody(rt, PAD, 0f, _screenBodyW, _screenBodyH);
+            else BuildScreenBody(rt, PAD, 0f, _screenBodyW, _screenBodyH);
         }
 
         private void BuildScreenBody(RectTransform parent, float x, float y, float w, float h)
@@ -1029,6 +1045,107 @@ namespace BetterFG.UI.Tab
             _lbSlot1R = 0f; _lbSlot1G = 0.5f; _lbSlot1B = 1f;
             _lbSlot2R = 0.8f; _lbSlot2G = 0.8f; _lbSlot2B = 1f;
             MenuCustomizationApplication.Instance?.RevertLobbyBGForeground();
+            RebuildScreenBody();
+        }
+
+        // ── Creative (level browser) body ─────────────────────────────────────
+        // four named colour slots on Generic_UI_CreativeBackground_Prefab_Canvas. see
+        // MenuCustomizationApplication.CreativeSlot.
+        private static readonly string[] CreativeSlotLabels = { "BACKDROP", "GLOWS", "DRAWINGS", "VIGNETTE" };
+
+        private void BuildCreativeBody(RectTransform parent, float x, float y, float w, float h)
+        {
+            var (_, content) = UGUIShip.CreateScrollView(parent, new Rect(0f, y, TabWidth, h));
+            float cy = PAD;
+
+            _crEnabledBtn = UGUIShip.CreateButton(content, new Rect(x, cy, w, BTN_H),
+                _crEnabled ? "Custom colours: ON" : "Custom colours: OFF", _crEnabled ? BTN_ON : BTN_DARK, WHITE, FS_SM,
+                new Action(() =>
+                {
+                    _crEnabled = !_crEnabled;
+                    SettingsService.Set(MenuCustomizationApplication.KEY_CREATIVE_ENABLED, _crEnabled ? "true" : "false");
+                    var lbl = _crEnabledBtn?.GetComponentInChildren<Text>();
+                    if (lbl != null) lbl.text = _crEnabled ? "Custom colours: ON" : "Custom colours: OFF";
+                    var img = _crEnabledBtn?.GetComponent<Image>();
+                    if (img != null) img.color = _crEnabled ? BTN_ON : BTN_DARK;
+                    ApplyCreativeLive();
+                }));
+            cy += BTN_H + SH;
+            UGUIShip.CreatePanel(content, new Rect(x, cy, w, 1f), new Color(1f, 1f, 1f, 0.06f));
+            cy += 1f + PAD;
+
+            float swatchW = BTN_H;
+            float sliderW = w - swatchW - PAD;
+
+            for (int i = 0; i < 4; i++)
+            {
+                int slot = i;
+                UGUIShip.CreateLabel(content, new Rect(x, cy, sliderW, LH), CreativeSlotLabels[slot], FS_SM, HINT);
+                cy += LH + SH;
+                var sw = new GameObject("CrSwatch" + slot);
+                sw.transform.SetParent(content, false);
+                UGUIShip.SetPixelRect(sw.AddComponent<RectTransform>(), new Rect(x + sliderW + PAD, cy, swatchW, (LH + SH) * 3f - SH));
+                _crSwatch[slot] = sw.AddComponent<Image>();
+                _crSwatch[slot].color = new Color(_crR[slot], _crG[slot], _crB[slot]);
+                UGUIShip.CreateColorControls(content, x, ref cy, sliderW,
+                    () => _crR[slot], () => _crG[slot], () => _crB[slot],
+                    v => _crR[slot] = v, v => _crG[slot] = v, v => _crB[slot] = v,
+                    () => { if (_crSwatch[slot] != null) _crSwatch[slot].color = new Color(_crR[slot], _crG[slot], _crB[slot]); },
+                    out _, out _, out _);
+
+                if (slot < 3) { UGUIShip.CreatePanel(content, new Rect(x, cy, w, 1f), new Color(1f, 1f, 1f, 0.06f)); cy += 1f + PAD; }
+            }
+
+            content.sizeDelta = new Vector2(0f, cy + PAD);
+        }
+
+        private void LoadCreativeSettings()
+        {
+            _crEnabled = SettingsService.Get(MenuCustomizationApplication.KEY_CREATIVE_ENABLED, "false") == "true";
+            for (int i = 0; i < 4; i++)
+            {
+                var c = MenuCustomizationApplication.CreativeSlotColor((MenuCustomizationApplication.CreativeSlot)i);
+                _crR[i] = c.r; _crG[i] = c.g; _crB[i] = c.b;
+            }
+        }
+
+        private void SaveCreativeSlots()
+        {
+            var ci = System.Globalization.CultureInfo.InvariantCulture;
+            for (int i = 0; i < 4; i++)
+            {
+                string k = "screen.creative." + (MenuCustomizationApplication.CreativeSlot)i;
+                SettingsService.Set(k + ".r", _crR[i].ToString(ci));
+                SettingsService.Set(k + ".g", _crG[i].ToString(ci));
+                SettingsService.Set(k + ".b", _crB[i].ToString(ci));
+            }
+        }
+
+        private void OnCreativeApply()
+        {
+            SaveCreativeSlots();
+            SettingsService.Set(MenuCustomizationApplication.KEY_CREATIVE_ENABLED, _crEnabled ? "true" : "false");
+            ApplyCreativeLive();
+        }
+
+        // push current sliders to settings first so the live bg reflects them (recolour reads settings)
+        private void ApplyCreativeLive()
+        {
+            SaveCreativeSlots();
+            MenuCustomizationApplication.Instance?.ReapplyCreativeBgLive();
+        }
+
+        private void OnCreativeRemove()
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                string k = "screen.creative." + (MenuCustomizationApplication.CreativeSlot)i;
+                SettingsService.Remove(k + ".r"); SettingsService.Remove(k + ".g"); SettingsService.Remove(k + ".b");
+            }
+            SettingsService.Remove(MenuCustomizationApplication.KEY_CREATIVE_ENABLED);
+            MenuCustomizationApplication.Instance?.ReapplyCreativeBgLive();
+            _crEnabled = false;
+            LoadCreativeSettings();
             RebuildScreenBody();
         }
 

@@ -2,6 +2,7 @@
 using System.Collections;
 using BepInEx.Unity.IL2CPP.Utils.Collections;
 using BetterFG.Customization.Menu;
+using BetterFG.Services;
 using FGClient;
 using FGClient.UI.Core;
 using FGClient.UI.RoundRevealCarousel;
@@ -98,7 +99,190 @@ namespace BetterFG.Patches
                 Plugin.Log.LogInfo("ScreenBg: DoFadeIn caught RoundRevealCarouselViewModel");
                 RoundRevealBg.Dispatch(reveal);
                 BetterFG.Tweaks.LeaveOnLoadingScreenTweak.OnExternalLeaveTriggerEnd();
+                return;
             }
+
+            var browser = __instance.TryCast<Wushu.LevelEditor.Runtime.UI.LevelBrowser.LevelBrowserScreenViewModel>();
+            if (browser != null && MenuCustomizationApplication.Instance != null &&
+                SettingsService.Get(MenuCustomizationApplication.KEY_CREATIVE_ENABLED, "false") == "true")
+            {
+                MenuCustomizationApplication.Instance.StartCoroutine(ApplyCreativeNextFrame(browser.transform).WrapToIl2Cpp());
+                return;
+            }
+
+            var inst = MenuCustomizationApplication.Instance;
+            if (inst == null) return;
+
+            // the radial's 7 menu-item canvases instantiate as it opens, after DoFadeIn, so a
+            // synchronous sweep misses them — delay it like the rulebook.
+            var radial = __instance.TryCast<LevelEditor_RadialMenuViewModel>();
+            if (radial != null)
+            {
+                inst.StartCoroutine(ApplyCreativeNextFrame(radial.transform, true).WrapToIl2Cpp());
+                return;
+            }
+
+            // parameter menu builds its rows after fade-in (synchronous sweep here only lands on the
+            // second open, once they persist), so delay the sweep a frame like the rulebook.
+            if (__instance.TryCast<LevelEditorParameterMenuViewModel>() != null)
+            {
+                inst.StartCoroutine(ApplyCreativeNextFrame(__instance.transform, true, null, false).WrapToIl2Cpp());
+                return;
+            }
+
+            // options + rulebook: recolour the whole screen immediately (no frame delay), leaving the creative
+            // background canvas to ApplyCreativeBg (its own slot colours). options keeps its Description block
+            // untouched; rulebook takes no shader.
+            if (__instance.TryCast<LevelEditorOptionsViewModel>() != null)
+            {
+                ApplyCreativeNow(__instance.transform, "Description", false);
+                return;
+            }
+            if (__instance.TryCast<LevelEditorRulebookViewModel>() != null)
+            {
+                ApplyCreativeNow(__instance.transform, null, true);
+                return;
+            }
+
+            // exit popup: just the foreground colours, no shader.
+            if (__instance.TryCast<LevelEditorExitPopupViewModel>() != null)
+            {
+                inst.ReapplyForegroundFromSettings(__instance.transform, null, true);
+                return;
+            }
+
+            // editor nav bar: recolour the Play Prompt (foreground colours, no shader) when the nav shows.
+            if (__instance.TryCast<LevelEditorNavigationScreenViewModel>() != null)
+            {
+                var pp = __instance.transform.Find("Safe Area/Play Prompt");
+                if (pp != null) inst.ReapplyForegroundFromSettings(pp, null, true);
+                return;
+            }
+
+            // main + welcome editor screens: kill any creative-bg canvas outright, then just the foreground (no shader).
+            if (__instance.TryCast<LevelEditorScreenViewModel>() != null ||
+                __instance.TryCast<LevelEditorWelcomeScreenViewModel>() != null)
+            {
+                inst.StartCoroutine(EditorScreenForeground(__instance.transform).WrapToIl2Cpp());
+                return;
+            }
+
+            // carousel items build as it opens, after DoFadeIn — generic sweep plus the by-name tile recolour.
+            if (__instance.TryCast<LevelEditorCarrouselViewModel>() != null)
+                LevelEditorCarrouselFolderPatch.ApplyCarrousel(__instance.transform);
+        }
+
+        // the browser rebuilds its bg canvas as it fades in, so wait a frame before recolouring.
+        // sweepForeground is set for the options/rulebook screens: also recolour everything outside
+        // the bg canvas once the screen's content has settled. extraExclude names another subtree to
+        // leave alone (options' Description).
+        internal static IEnumerator ApplyCreativeNextFrame(UnityEngine.Transform vmRoot, bool sweepForeground = false, string extraExclude = null, bool shader = true)
+        {
+            yield return null;
+            if (vmRoot == null) yield break;
+            UnityEngine.Transform canvas = null;
+            foreach (var t in vmRoot.GetComponentsInChildren<UnityEngine.Transform>(true))
+                if (t != null && t.name == "Generic_UI_CreativeBackground_Prefab_Canvas") { canvas = t; break; }
+            var inst = MenuCustomizationApplication.Instance;
+            if (inst == null) yield break;
+            if (SettingsService.Get(MenuCustomizationApplication.KEY_CREATIVE_ENABLED, "false") == "true")
+                inst.ApplyCreativeBg(canvas);
+            if (!sweepForeground) yield break;
+
+            // rulebook/parameter rows can take a couple more frames to populate, so give them time
+            // before sweeping or the fg recolour lands on an empty list.
+            yield return null;
+            yield return null;
+            if (vmRoot == null) yield break;
+            // SettingsBackingSprite is a baked cyan texture behind a white tint — flat colour can't
+            // touch it, so leave it out of the sweep and hand it the GPU shader instead.
+            string exclude = "Generic_UI_CreativeBackground_Prefab_Canvas|SettingsBackingSprite" + (extraExclude != null ? "|" + extraExclude : "");
+            inst.ReapplyForegroundFromSettings(vmRoot, exclude, true);
+            if (shader) inst.ApplyEditorShader(vmRoot);
+        }
+
+        // same as above but synchronous — for screens whose content is already built at DoFadeIn (options,
+        // rulebook) so they recolour on the same frame instead of flashing the game's colours first.
+        internal static void ApplyCreativeNow(UnityEngine.Transform vmRoot, string extraExclude = null, bool shader = true)
+        {
+            if (vmRoot == null) return;
+            var inst = MenuCustomizationApplication.Instance;
+            if (inst == null) return;
+            UnityEngine.Transform canvas = null;
+            foreach (var t in vmRoot.GetComponentsInChildren<UnityEngine.Transform>(true))
+                if (t != null && t.name == "Generic_UI_CreativeBackground_Prefab_Canvas") { canvas = t; break; }
+            if (SettingsService.Get(MenuCustomizationApplication.KEY_CREATIVE_ENABLED, "false") == "true")
+                inst.ApplyCreativeBg(canvas);
+            string exclude = "Generic_UI_CreativeBackground_Prefab_Canvas|SettingsBackingSprite" + (extraExclude != null ? "|" + extraExclude : "");
+            inst.ReapplyForegroundFromSettings(vmRoot, exclude, true);
+            if (shader) inst.ApplyEditorShader(vmRoot);
+        }
+
+        // main editor screen: its content isn't built at DoFadeIn, so wait a frame. kill any creative-bg
+        // canvas, then sweep foreground (no shader).
+        static IEnumerator EditorScreenForeground(UnityEngine.Transform vmRoot)
+        {
+            yield return null;
+            var inst = MenuCustomizationApplication.Instance;
+            if (vmRoot == null || inst == null) yield break;
+            foreach (var t in vmRoot.GetComponentsInChildren<UnityEngine.Transform>(true))
+                if (t != null && t.name == "Generic_UI_CreativeBackground_Prefab_Canvas") t.gameObject.SetActive(false);
+            inst.ReapplyForegroundFromSettings(vmRoot, null, true);
+        }
+    }
+
+    // ObjectInfo derives from a plain ViewModel (not ScreenViewModel), so DoFadeIn never fires for it.
+    // SetData runs each time the panel populates for the selected/highlighted object — sweep the whole
+    // UI_ObjectInfo_Main then (GetComponentsInChildren(true) covers the disabled state objects too) so
+    // it tracks live colour changes.
+    [HarmonyPatch(typeof(LevelEditorObjectInfoViewModel), "SetData")]
+    internal static class LevelEditorObjectInfoSetDataPatch
+    {
+        [HarmonyPostfix]
+        public static void Postfix(LevelEditorObjectInfoViewModel __instance)
+        {
+            if (__instance == null || MenuCustomizationApplication.Instance == null) return;
+            MenuCustomizationApplication.Instance.ReapplyForegroundFromSettings(__instance.transform, null, true);
+        }
+    }
+
+    // the carousel row and (once a type is opened) the "Folder Items" subtree both build their tiles a few
+    // frames after their trigger. their Background_Fill/Background_Selected want the blue/cyan replacements
+    // by name; the generic hue sweep handles everything else and skips those two.
+    [HarmonyPatch(typeof(LevelEditorCarrouselViewModel), "OnFolderEvent")]
+    internal static class LevelEditorCarrouselFolderPatch
+    {
+        // folder open: only the Folder Items subtree is new, so scope the work to it. re-sweeping the whole
+        // carrousel here is what hitched.
+        [HarmonyPostfix]
+        public static void Postfix(LevelEditorCarrouselViewModel __instance)
+        {
+            if (__instance == null) return;
+            Sweep(__instance.transform.Find("Folder Items"));
+        }
+
+        // carousel open: the whole carrousel needs the generic sweep once, plus the by-name tiles.
+        internal static void ApplyCarrousel(Transform carrousel)
+        {
+            var inst = MenuCustomizationApplication.Instance;
+            if (carrousel == null || inst == null) return;
+            inst.StartCoroutine(ScreenViewModelDoFadeInPatch.ApplyCreativeNextFrame(carrousel, true, null, false).WrapToIl2Cpp());
+            Sweep(carrousel.Find("Carousel_Items"));
+        }
+
+        static void Sweep(Transform tiles)
+        {
+            var inst = MenuCustomizationApplication.Instance;
+            if (tiles == null || inst == null) return;
+            inst.StartCoroutine(RecolourTiles(tiles).WrapToIl2Cpp());
+        }
+
+        static IEnumerator RecolourTiles(Transform tiles)
+        {
+            yield return null; yield return null; yield return null;
+            var inst = MenuCustomizationApplication.Instance;
+            if (tiles == null || inst == null) yield break;
+            inst.ApplyFolderTileColours(tiles);
         }
     }
 
@@ -199,5 +383,43 @@ namespace BetterFG.Patches
     {
         public ShowSelectorBgApplier(IntPtr ptr) : base(ptr) { }
         void OnEnable() => ShowSelectorBg.PaintSelf(transform);
+    }
+
+    // the level-editor menu backdrop is the same Creative prefab, but on the world-space CameraRig and
+    // DISABLED at menu entry until you switch to the level editor. GameObject.Find can't see it while
+    // hidden and the view-switch hook fired before it enabled, so it missed the first switch. drop an
+    // OnEnable applier on it at menu entry (transform.Find traverses inactive) — it paints itself the
+    // first time the editor view shows, and every show after.
+    internal static class CreativeEditorBg
+    {
+        static Transform FindCanvas()
+        {
+            var rig = GameObject.Find("CameraRig");
+            return rig == null ? null : rig.transform.Find("VirtualCameras/MainMenu_LevelEditor/Generic_UI_CreativeBackground_Prefab_Canvas");
+        }
+
+        public static void AttachApplier()
+        {
+            var canvas = FindCanvas();
+            if (canvas == null) return;
+            if (canvas.GetComponent<CreativeEditorBgApplier>() == null)
+                canvas.gameObject.AddComponent<CreativeEditorBgApplier>();
+        }
+
+        public static void PaintSelf(Transform canvas)
+        {
+            var app = MenuCustomizationApplication.Instance;
+            if (canvas == null || app == null) return;
+            if (SettingsService.Get(MenuCustomizationApplication.KEY_CREATIVE_ENABLED, "false") == "true")
+                app.ApplyCreativeBg(canvas);
+            else
+                app.RevertCreativeBg(canvas);
+        }
+    }
+
+    public class CreativeEditorBgApplier : MonoBehaviour
+    {
+        public CreativeEditorBgApplier(IntPtr ptr) : base(ptr) { }
+        void OnEnable() => CreativeEditorBg.PaintSelf(transform);
     }
 }

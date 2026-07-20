@@ -88,6 +88,7 @@ namespace BetterFG.Patches.GameStates
             }
 
             BetterFG.Patches.ShowSelectorBg.AttachApplier();
+            BetterFG.Patches.CreativeEditorBg.AttachApplier();
 
             MenuCustomizationApplication.Instance?.ReapplyToMainMenu();
             MenuCustomizationApplication.Instance?.SpawnMenuBg();

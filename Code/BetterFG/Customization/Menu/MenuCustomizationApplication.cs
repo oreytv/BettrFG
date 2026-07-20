@@ -203,7 +203,7 @@ namespace BetterFG.Customization.Menu
             Instance.ReapplyForegroundFromSettings(scopeRoot);
         }
 
-        public void ReapplyForegroundFromSettings(Transform scopeRoot = null, string excludeSubtreeName = null)
+        public void ReapplyForegroundFromSettings(Transform scopeRoot = null, string excludeSubtreeName = null, bool anyImage = false)
         {
             bool fullCanvas = scopeRoot == null;
             var ci = System.Globalization.CultureInfo.InvariantCulture;
@@ -231,7 +231,7 @@ namespace BetterFG.Customization.Menu
                 blueOn, new Color(P(KEY_FG_BLUE_R, 0.1f), P(KEY_FG_BLUE_G, 0.25f), P(KEY_FG_BLUE_B, 0.85f)),
                 pinkOn, new Color(P(KEY_FG_PINK_R, 1f), P(KEY_FG_PINK_G, 0.2f), P(KEY_FG_PINK_B, 0.5f)),
                 orangeOn, new Color(P(KEY_FG_ORANGE_R, 1f), P(KEY_FG_ORANGE_G, 0.55f), P(KEY_FG_ORANGE_B, 0.1f)),
-                scopeRoot, excludeSubtreeName
+                scopeRoot, excludeSubtreeName, anyImage
             );
 
             if (fullCanvas)
@@ -382,7 +382,7 @@ namespace BetterFG.Customization.Menu
 
         // ── Foreground ────────────────────────────────────────────────────────
 
-        public void ApplyForeground(bool cyanOn, Color cyanTarget, bool blackOn, Color blackTarget, bool yellowOn, Color yellowTarget, bool blueOn = false, Color blueTarget = default, bool pinkOn = false, Color pinkTarget = default, bool orangeOn = false, Color orangeTarget = default, Transform scopeRoot = null, string excludeSubtreeName = null)
+        public void ApplyForeground(bool cyanOn, Color cyanTarget, bool blackOn, Color blackTarget, bool yellowOn, Color yellowTarget, bool blueOn = false, Color blueTarget = default, bool pinkOn = false, Color pinkTarget = default, bool orangeOn = false, Color orangeTarget = default, Transform scopeRoot = null, string excludeSubtreeName = null, bool anyImage = false)
         {
             if (scopeRoot == null)
             {
@@ -393,6 +393,9 @@ namespace BetterFG.Customization.Menu
             }
 
             var images = scopeRoot.GetComponentsInChildren<UnityEngine.UI.Image>(true);
+            // excludeSubtreeName may be several names joined by '|' (e.g. the creative bg canvas plus
+            // the options screen's Description block); anything under one of them is left alone.
+            string[] excludes = excludeSubtreeName == null ? null : excludeSubtreeName.Split('|');
 
             foreach (var img in images)
             {
@@ -405,15 +408,20 @@ namespace BetterFG.Customization.Menu
                 {
                     if (p.name.StartsWith("StarPopup_")) inStarPopup = true;
                     if (p.name == "TeamContainer") inTeamContainer = true;
-                    if (excludeSubtreeName != null && p.name == excludeSubtreeName) inExcluded = true;
+                    if (excludes != null) foreach (var ex in excludes) if (p.name == ex) { inExcluded = true; break; }
                     p = p.parent;
                 }
                 if (inStarPopup || inExcluded || inTeamContainer) continue;
                 string n = img.gameObject.name;
+                // carousel/folder tiles are recoloured by name in ApplyFolderTileColours (Fill->blue,
+                // Selected->cyan); the hue sweep mis-buckets Background_Fill as cyan, so leave both to it.
+                if (n == "Background_Fill" || n == "Background_Selected") continue;
                 bool isFill = n.Contains("Fill") || n.Contains("Background") || n.Contains("Outline") || n.Contains("Inline") || n.Contains("BG");
                 bool isCrowns = n.Equals("crowns");
                 bool isBacking = n.Contains("Backing");
-                if (!isFill && !isBacking && !isCrowns) continue;
+                // level-editor screens (anyImage) recolour every hue-matching image, not just the
+                // menu's Fill/Backing/crowns-named ones — their controls are named Slider/Overlay/etc.
+                if (!anyImage && !isFill && !isBacking && !isCrowns) continue;
 
                 int id = img.GetInstanceID();
                 Color c = _fgOriginals.TryGetValue(id, out var cachedOrig) ? cachedOrig : img.color;
@@ -455,6 +463,33 @@ namespace BetterFG.Customization.Menu
             }
 
             ApplyMainPlayButtonUnselectedFill(scopeRoot, yellowOn, yellowTarget);
+        }
+
+        // level-editor variation folder: recolour by name only. Background_Fill -> blue, Background_Selected
+        // -> cyan. covers the disabled tile states too (GetComponentsInChildren(true)); originals tracked so
+        // RevertForeground puts them back.
+        public void ApplyFolderTileColours(Transform folderRoot)
+        {
+            bool blueOn = SettingsService.Get(KEY_FG_BLUE_ON, "false") == "true";
+            bool cyanOn = SettingsService.Get(KEY_FG_CYAN_ON, "false") == "true";
+            if (!blueOn && !cyanOn) return;
+
+            Color blue = BlueReplacement();
+            Color cyan = new Color(ParseF(KEY_FG_CYAN_R, 0f), ParseF(KEY_FG_CYAN_G, 0.3f), ParseF(KEY_FG_CYAN_B, 1f));
+
+            foreach (var img in folderRoot.GetComponentsInChildren<UnityEngine.UI.Image>(true))
+            {
+                if (img == null) continue;
+                string n = img.gameObject.name;
+                bool fill = blueOn && n == "Background_Fill";
+                bool sel = cyanOn && n == "Background_Selected";
+                if (!fill && !sel) continue;
+
+                int id = img.GetInstanceID();
+                if (!_fgOriginals.ContainsKey(id)) { _fgOriginals[id] = img.color; _fgTouchedImages[id] = img; }
+                Color target = fill ? blue : cyan;
+                img.color = new Color(target.r, target.g, target.b, img.color.a);
+            }
         }
 
         public void RevertForeground()
@@ -746,6 +781,57 @@ namespace BetterFG.Customization.Menu
             }
         }
 
+        // editor screens (radial, settings backing, etc) bake their colours into the texture behind a
+        // white image tint, so a flat colour swap can't reach them — the same reason the ingame HUD
+        // needs a shader. white-tinted images get the pink/grey UI shader (with a cyan band added) so
+        // the baked cyan/pink/grey remap on the GPU while white edges stay white. its own material keeps
+        // this config off the ingame _pinkGreyMat.
+        private UnityEngine.Material _editorShaderMat;
+
+        public void ApplyEditorShader(Transform scopeRoot)
+        {
+            bool cyanOn = SettingsService.Get(KEY_FG_CYAN_ON, "false") == "true";
+            bool pinkOn = SettingsService.Get(KEY_FG_PINK_ON, "false") == "true";
+            bool blackOn = SettingsService.Get(KEY_FG_BLACK_ON, "false") == "true";
+            bool anyOn = cyanOn || pinkOn || blackOn;
+
+            if (anyOn)
+            {
+                if (_editorShaderMat == null)
+                {
+                    var sh = BetterFG.Core.AssetManager.GetShader("bettrfg_ui_shader");
+                    if (sh == null) { Plugin.Log.LogWarning("bettrfg_ui_shader missing, editor recolour is off"); return; }
+                    _editorShaderMat = new UnityEngine.Material(sh) { hideFlags = HideFlags.HideAndDontSave };
+                    UnityEngine.Object.DontDestroyOnLoad(_editorShaderMat);
+                }
+                _editorShaderMat.SetColor("_CyanColor", new Color(ParseF(KEY_FG_CYAN_R, 0f), ParseF(KEY_FG_CYAN_G, 0.3f), ParseF(KEY_FG_CYAN_B, 1f), 1f));
+                _editorShaderMat.SetColor("_PinkColor", PinkReplacement());
+                _editorShaderMat.SetColor("_BlackColor", BlackReplacement());
+                _editorShaderMat.SetFloat("_CyanOn", cyanOn ? 1f : 0f);
+                _editorShaderMat.SetFloat("_PinkOn", pinkOn ? 1f : 0f);
+                _editorShaderMat.SetFloat("_BlackOn", blackOn ? 1f : 0f);
+            }
+
+            foreach (var img in scopeRoot.GetComponentsInChildren<UnityEngine.UI.Image>(true))
+            {
+                if (img == null) continue;
+                if (img.gameObject.name.IndexOf("glyph", StringComparison.OrdinalIgnoreCase) >= 0) continue;
+
+                // row SelectedStateOverlay highlights are light cyan/blue; the flat sweep turns them
+                // into the cyan replacement, but they should read as faint white instead.
+                if (img.gameObject.name == "SelectedStateOverlay")
+                {
+                    if (cyanOn) img.color = new Color(1f, 1f, 1f, 0.2f);
+                    continue;
+                }
+
+                // white-tinted images carry their colour in the texture — hand them the shader.
+                var c = img.color;
+                if (c.r >= 0.99f && c.g >= 0.99f && c.b >= 0.99f)
+                    img.material = anyOn ? _editorShaderMat : null;
+            }
+        }
+
         private static UnityEngine.Sprite ProcessShowSelectSprite(UnityEngine.Sprite sprite)
         {
             bool cyanOn = SettingsService.Get(KEY_FG_CYAN_ON, "false") == "true";
@@ -932,6 +1018,84 @@ namespace BetterFG.Customization.Menu
                 img.color = new Color(target.r, target.g, target.b, original.a);
             }
 
+        }
+
+        // ── Creative (level browser) background ────────────────────────────────
+        // Generic_UI_CreativeBackground_Prefab_Canvas is a flat paper-craft UI with named image
+        // groups, not a gradient. one colour per slot; Drawings also covers the Grid image.
+        // originals cached per Image id so remove restores the game's own colours.
+        public enum CreativeSlot { Backdrop, Glows, Drawings, Vignette }
+        public const string KEY_CREATIVE_ENABLED = "screen.creative.enabled";
+
+        public static Color CreativeSlotColor(CreativeSlot slot)
+        {
+            string k = $"screen.creative.{slot}";
+            Color d = slot == CreativeSlot.Backdrop ? new Color(0.98f, 0.93f, 0.82f)
+                    : slot == CreativeSlot.Glows ? new Color(1f, 0.98f, 0.9f)
+                    : slot == CreativeSlot.Drawings ? new Color(0.2f, 0.3f, 0.45f)
+                    : Color.black;
+            return new Color(ParseF(k + ".r", d.r), ParseF(k + ".g", d.g), ParseF(k + ".b", d.b));
+        }
+
+        private readonly Dictionary<int, Color> _creativeOriginals = new Dictionary<int, Color>();
+
+        // the prefab shows up in two spots, both full-path pinned (the level editor's other variants
+        // share the name): the level browser popup, and the level-editor menu backdrop on the
+        // world-space CameraRig (view index 3 of the MainMenuBuilder switcher).
+        private static Transform CreativeBrowserCanvas()
+        {
+            var go = GameObject.Find("UICanvas_Client_V2(Clone)/Popup/Prime_UI_LE_LevelBrowser(Clone)/Generic_UI_CreativeBackground_Prefab_Canvas");
+            return go != null ? go.transform : null;
+        }
+
+        public static Transform CreativeEditorCanvas()
+        {
+            var go = GameObject.Find("CameraRig/VirtualCameras/MainMenu_LevelEditor/Generic_UI_CreativeBackground_Prefab_Canvas");
+            return go != null ? go.transform : null;
+        }
+
+        public void ApplyCreativeBg(Transform canvas)
+        {
+            if (canvas == null) return;
+            RecolorCreative(canvas.Find("Backdrop"), CreativeSlot.Backdrop);
+            RecolorCreativeChildren(canvas.Find("Glows"), CreativeSlot.Glows);
+            RecolorCreative(canvas.Find("Grid"), CreativeSlot.Drawings);
+            RecolorCreativeChildren(canvas.Find("Drawings"), CreativeSlot.Drawings);
+            RecolorCreative(canvas.Find("Vignette"), CreativeSlot.Vignette);
+        }
+
+        public void RevertCreativeBg(Transform canvas)
+        {
+            if (canvas == null) return;
+            foreach (var g in canvas.GetComponentsInChildren<UnityEngine.UI.Graphic>(true))
+                if (g != null && _creativeOriginals.TryGetValue(g.GetInstanceID(), out var c)) g.color = c;
+        }
+
+        // Screen tab Apply/Remove/toggle — repaint or revert whichever creative canvas is up right now
+        public void ReapplyCreativeBgLive()
+        {
+            bool on = SettingsService.Get(KEY_CREATIVE_ENABLED, "false") == "true";
+            foreach (var canvas in new[] { CreativeBrowserCanvas(), CreativeEditorCanvas() })
+            {
+                if (canvas == null) continue;
+                if (on) ApplyCreativeBg(canvas); else RevertCreativeBg(canvas);
+            }
+        }
+
+        private void RecolorCreativeChildren(Transform parent, CreativeSlot slot)
+        {
+            if (parent == null) return;
+            for (int i = 0; i < parent.childCount; i++) RecolorCreative(parent.GetChild(i), slot);
+        }
+
+        private void RecolorCreative(Transform t, CreativeSlot slot)
+        {
+            var g = t != null ? t.GetComponent<UnityEngine.UI.Graphic>() : null;
+            if (g == null) return;
+            int id = g.GetInstanceID();
+            if (!_creativeOriginals.ContainsKey(id)) _creativeOriginals[id] = g.color;
+            var c = CreativeSlotColor(slot);
+            g.color = new Color(c.r, c.g, c.b, g.color.a);
         }
 
         // gradient settings keys — these are the FallForce screen's keys (menu + title share them).

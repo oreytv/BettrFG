@@ -100,7 +100,8 @@ namespace BetterFG.UI
         private RectTransform _titleRt;
         private static readonly Vector3 TitleClosedPos = new Vector3(21.6729f, 228.6001f, 0f);
         private static readonly Vector3 TitleOpenedPos = new Vector3(21.6729f, 221.1817f, 0f);
-        private const float TitleExtraReach = 30f;
+        private const float TitleReachClosed = 8f;
+        private const float TitleReachOpened = -4f;
 
         public virtual string TabTitle => "Tab";
 
@@ -121,7 +122,14 @@ namespace BetterFG.UI
             set
             {
                 _isOpen = value;
-                if (_titleRt != null) _titleRt.localPosition = value ? TitleOpenedPos : TitleClosedPos;
+                if (_titleRt != null)
+                {
+                    // grow the click zone downward via height only — writing offsetMin would also reset
+                    // the horizontal stretch inset and jitter the title sideways for a frame
+                    var sd = _titleRt.sizeDelta;
+                    _titleRt.sizeDelta = new Vector2(sd.x, UIScale.TITLE_H + (value ? TitleReachOpened : TitleReachClosed));
+                    _titleRt.localPosition = value ? TitleOpenedPos : TitleClosedPos;
+                }
             }
         }
 
@@ -163,7 +171,7 @@ namespace BetterFG.UI
             titleRt.pivot = new Vector2(0.5f, 1f);
             // rect reaches lower than the visible title so the click/hover zone follows the tilted
             // text down; the label is pinned to the original top band so growing this doesn't move it
-            titleRt.offsetMin = new Vector2(0f, -UIScale.TITLE_H - TitleExtraReach);
+            titleRt.offsetMin = new Vector2(0f, -UIScale.TITLE_H - TitleReachClosed);
             titleRt.offsetMax = Vector2.zero;
             _titleRt = titleRt;
             titleRt.localPosition = TitleClosedPos;

@@ -138,6 +138,7 @@ namespace BetterFG
             ClassInjector.RegisterTypeInIl2Cpp<RingGraphic>();
             ClassInjector.RegisterTypeInIl2Cpp<AutoFetchTrigger>();
             ClassInjector.RegisterTypeInIl2Cpp<BetterFG.Patches.ShowSelectorBgApplier>();
+            ClassInjector.RegisterTypeInIl2Cpp<BetterFG.Patches.CreativeEditorBgApplier>();
             ClassInjector.RegisterTypeInIl2Cpp<BetterFG.Features.QualificationTime.PBPopupDestroyWatcher>();
             ClassInjector.RegisterTypeInIl2Cpp<BetterFG.Nametag.GifAnimator>();
             ClassInjector.RegisterTypeInIl2Cpp<BetterFG.Tweaks.BlinkDriverComponent>();
