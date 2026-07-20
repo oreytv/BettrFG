@@ -203,7 +203,7 @@ namespace BetterFG.Customization.Menu
             Instance.ReapplyForegroundFromSettings(scopeRoot);
         }
 
-        public void ReapplyForegroundFromSettings(Transform scopeRoot = null, string excludeSubtreeName = null, bool anyImage = false)
+        public void ReapplyForegroundFromSettings(Transform scopeRoot = null, string excludeSubtreeName = null, bool anyImage = false, bool refreshOriginals = false)
         {
             bool fullCanvas = scopeRoot == null;
             var ci = System.Globalization.CultureInfo.InvariantCulture;
@@ -231,7 +231,7 @@ namespace BetterFG.Customization.Menu
                 blueOn, new Color(P(KEY_FG_BLUE_R, 0.1f), P(KEY_FG_BLUE_G, 0.25f), P(KEY_FG_BLUE_B, 0.85f)),
                 pinkOn, new Color(P(KEY_FG_PINK_R, 1f), P(KEY_FG_PINK_G, 0.2f), P(KEY_FG_PINK_B, 0.5f)),
                 orangeOn, new Color(P(KEY_FG_ORANGE_R, 1f), P(KEY_FG_ORANGE_G, 0.55f), P(KEY_FG_ORANGE_B, 0.1f)),
-                scopeRoot, excludeSubtreeName, anyImage
+                scopeRoot, excludeSubtreeName, anyImage, refreshOriginals
             );
 
             if (fullCanvas)
@@ -382,7 +382,7 @@ namespace BetterFG.Customization.Menu
 
         // ── Foreground ────────────────────────────────────────────────────────
 
-        public void ApplyForeground(bool cyanOn, Color cyanTarget, bool blackOn, Color blackTarget, bool yellowOn, Color yellowTarget, bool blueOn = false, Color blueTarget = default, bool pinkOn = false, Color pinkTarget = default, bool orangeOn = false, Color orangeTarget = default, Transform scopeRoot = null, string excludeSubtreeName = null, bool anyImage = false)
+        public void ApplyForeground(bool cyanOn, Color cyanTarget, bool blackOn, Color blackTarget, bool yellowOn, Color yellowTarget, bool blueOn = false, Color blueTarget = default, bool pinkOn = false, Color pinkTarget = default, bool orangeOn = false, Color orangeTarget = default, Transform scopeRoot = null, string excludeSubtreeName = null, bool anyImage = false, bool refreshOriginals = false)
         {
             if (scopeRoot == null)
             {
@@ -404,14 +404,16 @@ namespace BetterFG.Customization.Menu
                 bool inStarPopup = false;
                 bool inExcluded = false;
                 bool inTeamContainer = false;
+                bool inPhraseOverlay = false;
                 while (p != null)
                 {
                     if (p.name.StartsWith("StarPopup_")) inStarPopup = true;
                     if (p.name == "TeamContainer") inTeamContainer = true;
+                    if (p.name == "TabContentSocialPhraseOverlay") inPhraseOverlay = true;
                     if (excludes != null) foreach (var ex in excludes) if (p.name == ex) { inExcluded = true; break; }
                     p = p.parent;
                 }
-                if (inStarPopup || inExcluded || inTeamContainer) continue;
+                if (inStarPopup || inExcluded || inTeamContainer || inPhraseOverlay) continue;
                 string n = img.gameObject.name;
                 // carousel/folder tiles are recoloured by name in ApplyFolderTileColours (Fill->blue,
                 // Selected->cyan); the hue sweep mis-buckets Background_Fill as cyan, so leave both to it.
@@ -424,7 +426,9 @@ namespace BetterFG.Customization.Menu
                 if (!anyImage && !isFill && !isBacking && !isCrowns) continue;
 
                 int id = img.GetInstanceID();
-                Color c = _fgOriginals.TryGetValue(id, out var cachedOrig) ? cachedOrig : img.color;
+                // refreshOriginals: the game just repainted this image to a new state colour (radial
+                // select/deselect/disable), so the live colour is the real source hue, not the stale cache.
+                Color c = (!refreshOriginals && _fgOriginals.TryGetValue(id, out var cachedOrig)) ? cachedOrig : img.color;
                 Color.RGBToHSV(c, out float h, out float s, out float v);
 
                 bool matchCyan = cyanOn && s > 0.3f && h >= 0.47f && h <= 0.58f;
@@ -445,7 +449,7 @@ namespace BetterFG.Customization.Menu
 
                 if (!matchCyan && !matchBlue && !matchBlack && !matchYellow && !matchPink && !matchOrange) continue;
 
-                if (!_fgOriginals.ContainsKey(id))
+                if (refreshOriginals || !_fgOriginals.ContainsKey(id))
                 {
                     _fgOriginals[id] = c;
                     _fgTouchedImages[id] = img;

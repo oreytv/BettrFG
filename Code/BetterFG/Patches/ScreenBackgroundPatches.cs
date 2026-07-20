@@ -251,6 +251,22 @@ namespace BetterFG.Patches
         }
     }
 
+    // UpdateButtonState repaints an item's fill to the game's selected/deselected colour on every
+    // cursor move, wiping our tint off the whole radial. re-sweep the radial foreground after it.
+    [HarmonyPatch(typeof(LevelEditor_RadialMenuItemViewModel), "UpdateButtonState")]
+    internal static class RadialItemUpdateButtonStatePatch
+    {
+        [HarmonyPostfix]
+        public static void Postfix(LevelEditor_RadialMenuItemViewModel __instance)
+        {
+            var inst = MenuCustomizationApplication.Instance;
+            if (__instance == null || inst == null) return;
+            if (SettingsService.Get(MenuCustomizationApplication.KEY_CREATIVE_ENABLED, "false") != "true") return;
+            var content = __instance.transform.parent;
+            inst.ReapplyForegroundFromSettings(content != null ? content : __instance.transform, null, true, true);
+        }
+    }
+
     // the carousel row and (once a type is opened) the "Folder Items" subtree both build their tiles a few
     // frames after their trigger. their Background_Fill/Background_Selected want the blue/cyan replacements
     // by name; the generic hue sweep handles everything else and skips those two.
