@@ -126,6 +126,7 @@ namespace BetterFG.Patches
             // second open, once they persist), so delay the sweep a frame like the rulebook.
             if (__instance.TryCast<LevelEditorParameterMenuViewModel>() != null)
             {
+                CreativeUIPatches.FixParametersMenu(__instance.transform);
                 inst.StartCoroutine(ApplyCreativeNextFrame(__instance.transform, true, null, false).WrapToIl2Cpp());
                 return;
             }
@@ -151,11 +152,15 @@ namespace BetterFG.Patches
                 return;
             }
 
-            // editor nav bar: recolour the Play Prompt (foreground colours, no shader) when the nav shows.
+            // editor nav bar: recolour the whole Safe Area (Play + Library prompts, no shader) when the nav shows.
             if (__instance.TryCast<LevelEditorNavigationScreenViewModel>() != null)
             {
-                var pp = __instance.transform.Find("Safe Area/Play Prompt");
-                if (pp != null) inst.ReapplyForegroundFromSettings(pp, null, true);
+                var safe = __instance.transform.Find("Safe Area");
+                if (safe != null)
+                {
+                    inst.ReapplyForegroundFromSettings(safe, null, true);
+                    CreativeUIPatches.FixLibraryPrompt(safe);
+                }
                 return;
             }
 
