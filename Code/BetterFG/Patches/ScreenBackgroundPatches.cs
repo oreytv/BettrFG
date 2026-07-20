@@ -390,41 +390,11 @@ namespace BetterFG.Patches
         void OnEnable() => ShowSelectorBg.PaintSelf(transform);
     }
 
-    // the level-editor menu backdrop is the same Creative prefab, but on the world-space CameraRig and
-    // DISABLED at menu entry until you switch to the level editor. GameObject.Find can't see it while
-    // hidden and the view-switch hook fired before it enabled, so it missed the first switch. drop an
-    // OnEnable applier on it at menu entry (transform.Find traverses inactive) — it paints itself the
-    // first time the editor view shows, and every show after.
-    internal static class CreativeEditorBg
-    {
-        static Transform FindCanvas()
-        {
-            var rig = GameObject.Find("CameraRig");
-            return rig == null ? null : rig.transform.Find("VirtualCameras/MainMenu_LevelEditor/Generic_UI_CreativeBackground_Prefab_Canvas");
-        }
-
-        public static void AttachApplier()
-        {
-            var canvas = FindCanvas();
-            if (canvas == null) return;
-            if (canvas.GetComponent<CreativeEditorBgApplier>() == null)
-                canvas.gameObject.AddComponent<CreativeEditorBgApplier>();
-        }
-
-        public static void PaintSelf(Transform canvas)
-        {
-            var app = MenuCustomizationApplication.Instance;
-            if (canvas == null || app == null) return;
-            if (SettingsService.Get(MenuCustomizationApplication.KEY_CREATIVE_ENABLED, "false") == "true")
-                app.ApplyCreativeBg(canvas);
-            else
-                app.RevertCreativeBg(canvas);
-        }
-    }
-
+    // sits on the level-editor menu backdrop (the Creative prefab on the world-space CameraRig), which
+    // is disabled at menu entry until the editor view shows. repaints on every enable.
     public class CreativeEditorBgApplier : MonoBehaviour
     {
         public CreativeEditorBgApplier(IntPtr ptr) : base(ptr) { }
-        void OnEnable() => CreativeEditorBg.PaintSelf(transform);
+        void OnEnable() => MenuCustomizationApplication.Instance?.RefreshCreativeCanvas(transform);
     }
 }

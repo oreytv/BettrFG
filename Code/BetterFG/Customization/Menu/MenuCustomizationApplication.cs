@@ -415,7 +415,7 @@ namespace BetterFG.Customization.Menu
                 string n = img.gameObject.name;
                 // carousel/folder tiles are recoloured by name in ApplyFolderTileColours (Fill->blue,
                 // Selected->cyan); the hue sweep mis-buckets Background_Fill as cyan, so leave both to it.
-                if (n == "Background_Fill" || n == "Background_Selected") continue;
+                if (!anyImage && (n == "Background_Fill" || n == "Background_Selected")) continue;
                 bool isFill = n.Contains("Fill") || n.Contains("Background") || n.Contains("Outline") || n.Contains("Inline") || n.Contains("BG");
                 bool isCrowns = n.Equals("crowns");
                 bool isBacking = n.Contains("Backing");
@@ -1071,15 +1071,20 @@ namespace BetterFG.Customization.Menu
                 if (g != null && _creativeOriginals.TryGetValue(g.GetInstanceID(), out var c)) g.color = c;
         }
 
-        // Screen tab Apply/Remove/toggle — repaint or revert whichever creative canvas is up right now
+        // apply if enabled, else revert — for one creative canvas. the editor canvas' OnEnable applier
+        // and the Screen tab both go through here.
+        public void RefreshCreativeCanvas(Transform canvas)
+        {
+            if (canvas == null) return;
+            if (SettingsService.Get(KEY_CREATIVE_ENABLED, "false") == "true") ApplyCreativeBg(canvas);
+            else RevertCreativeBg(canvas);
+        }
+
+        // Screen tab Apply/Remove/toggle — hit whichever creative canvas is up right now
         public void ReapplyCreativeBgLive()
         {
-            bool on = SettingsService.Get(KEY_CREATIVE_ENABLED, "false") == "true";
-            foreach (var canvas in new[] { CreativeBrowserCanvas(), CreativeEditorCanvas() })
-            {
-                if (canvas == null) continue;
-                if (on) ApplyCreativeBg(canvas); else RevertCreativeBg(canvas);
-            }
+            RefreshCreativeCanvas(CreativeBrowserCanvas());
+            RefreshCreativeCanvas(CreativeEditorCanvas());
         }
 
         private void RecolorCreativeChildren(Transform parent, CreativeSlot slot)

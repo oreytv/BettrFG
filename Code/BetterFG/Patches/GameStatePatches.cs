@@ -88,7 +88,13 @@ namespace BetterFG.Patches.GameStates
             }
 
             BetterFG.Patches.ShowSelectorBg.AttachApplier();
-            BetterFG.Patches.CreativeEditorBg.AttachApplier();
+
+            // the level-editor menu backdrop is disabled at entry, and GameObject.Find can't see it while
+            // hidden — transform.Find walks inactive. drop the OnEnable applier so it paints on the first
+            // switch to the editor view and every one after.
+            var creativeEditorBg = GameObject.Find("CameraRig")?.transform.Find("VirtualCameras/MainMenu_LevelEditor/Generic_UI_CreativeBackground_Prefab_Canvas");
+            if (creativeEditorBg != null && creativeEditorBg.GetComponent<CreativeEditorBgApplier>() == null)
+                creativeEditorBg.gameObject.AddComponent<CreativeEditorBgApplier>();
 
             MenuCustomizationApplication.Instance?.ReapplyToMainMenu();
             MenuCustomizationApplication.Instance?.SpawnMenuBg();
