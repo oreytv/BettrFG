@@ -333,6 +333,9 @@ namespace BetterFG.UI.Windows
             _titleLabelRt = t.rectTransform;
             _titleLabelRt.anchorMin = Vector2.zero;
             _titleLabelRt.anchorMax = Vector2.one;
+            // CreateLabel leaves pivot at (0,1); every window's TitlePosition was tuned against the
+            // old centered pivot, so restore it or all titles drift down-right
+            _titleLabelRt.pivot = new Vector2(0.5f, 0.5f);
             _titleLabelRt.offsetMin = new Vector2(PAD, 0f);
             _titleLabelRt.offsetMax = Vector2.zero;
             _titleLabelRt.localPosition = TitlePosition;

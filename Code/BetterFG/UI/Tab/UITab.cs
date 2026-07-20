@@ -14,7 +14,7 @@ namespace BetterFG.UI.Tab
     {
         public UITab(IntPtr ptr) : base(ptr) { }
 
-        public override string TabTitle => "UI";
+        public override string TabTitle => "User Interface";
 
         private static float PAD => UIScale.PAD;
         private static float VPAD => UIScale.VPAD;

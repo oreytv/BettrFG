@@ -96,6 +96,12 @@ namespace BetterFG.UI
         private RawImage _hoverImg;
         private bool _hovered;
 
+        // TitleBar's own transform. closed sits at y 231.0001, slides down to 226.2728 when opened
+        private RectTransform _titleRt;
+        private static readonly Vector3 TitleClosedPos = new Vector3(21.6729f, 228.6001f, 0f);
+        private static readonly Vector3 TitleOpenedPos = new Vector3(21.6729f, 221.1817f, 0f);
+        private const float TitleExtraReach = 30f;
+
         public virtual string TabTitle => "Tab";
 
         public float TabWidth { get; set; } = UIScale.TAB_W;
@@ -107,7 +113,17 @@ namespace BetterFG.UI
         public static float TITLE_H => UIScale.TITLE_H;
 
         public RectTransform Root { get; private set; }
-        public bool IsOpen { get; set; } = false;
+
+        private bool _isOpen = false;
+        public bool IsOpen
+        {
+            get => _isOpen;
+            set
+            {
+                _isOpen = value;
+                if (_titleRt != null) _titleRt.localPosition = value ? TitleOpenedPos : TitleClosedPos;
+            }
+        }
 
         private bool _built = false;
 
@@ -145,17 +161,25 @@ namespace BetterFG.UI
             titleRt.anchorMin = new Vector2(0f, 1f);
             titleRt.anchorMax = new Vector2(1f, 1f);
             titleRt.pivot = new Vector2(0.5f, 1f);
-            titleRt.offsetMin = new Vector2(0f, -UIScale.TITLE_H);
+            // rect reaches lower than the visible title so the click/hover zone follows the tilted
+            // text down; the label is pinned to the original top band so growing this doesn't move it
+            titleRt.offsetMin = new Vector2(0f, -UIScale.TITLE_H - TitleExtraReach);
             titleRt.offsetMax = Vector2.zero;
+            _titleRt = titleRt;
+            titleRt.localPosition = TitleClosedPos;
+            titleRt.localRotation = Quaternion.Euler(22f, 345f, 0f);
+            titleRt.localScale = new Vector3(1.2f, 1.3f, 1.3f);
 
             var t = UGUIShip.CreateLabel(titleGo.transform, default, TabTitle.ToUpper(), UIScale.FS_TITLE,
                 new Color(1f, 1f, 1f, 0.85f), TextAnchor.MiddleLeft);
             t.fontStyle = FontStyle.Bold;
             var labelRt = t.rectTransform;
-            labelRt.anchorMin = Vector2.zero;
-            labelRt.anchorMax = Vector2.one;
-            labelRt.offsetMin = new Vector2(UIScale.PAD * 3f, 0f);
-            labelRt.offsetMax = Vector2.zero;
+            labelRt.anchorMin = new Vector2(0f, 1f);
+            labelRt.anchorMax = new Vector2(1f, 1f);
+            labelRt.pivot = new Vector2(0.5f, 1f);
+            labelRt.sizeDelta = new Vector2(0f, UIScale.TITLE_H);
+            labelRt.anchoredPosition = Vector2.zero;
+            labelRt.offsetMin = new Vector2(UIScale.PAD * 3f, labelRt.offsetMin.y);
 
             var hoverGo = new GameObject("HoverTint");
             hoverGo.transform.SetParent(titleGo.transform, false);

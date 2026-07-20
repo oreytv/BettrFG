@@ -67,6 +67,30 @@
 	  <Exec Command="powershell -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\BetterFG.Installer\close_installer.ps1&quot;" ContinueOnError="true" />
 	</Target>
 
+	<!-- Inside VS only: pop a little checkbox dialog before the build so you can pick which copy steps
+	     run, instead of hardcoding /p: flags. Command-line MSBuild never sets BuildingInsideVisualStudio,
+	     so scripted/CI builds skip it and honor whatever flags were passed. Pass /p:NoBuildPrompt=true
+	     (or set <NoBuildPrompt>true</NoBuildPrompt> in a config/.user file) to skip it in VS too. -->
+	<Target Name="BettrFGBuildPrompt" BeforeTargets="KillFallGuysBeforeBuild;BeforeBuild"
+	        Condition="'$(BuildingInsideVisualStudio)' == 'true' And '$(NoBuildPrompt)' != 'true' And '$(DesignTimeBuild)' != 'true' And '$(SkipCopyDll)' != 'true'">
+	  <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -STA -File &quot;$(MSBuildProjectDirectory)\build_prompt.ps1&quot;" ConsoleToMSBuild="true">
+	    <Output TaskParameter="ConsoleOutput" PropertyName="BettrFGPromptOut" />
+	  </Exec>
+	  <PropertyGroup>
+	    <CopyBuildsToSteam Condition="$(BettrFGPromptOut.Contains('STEAM=1'))">true</CopyBuildsToSteam>
+	    <CopyBuildsToSteam Condition="$(BettrFGPromptOut.Contains('STEAM=0'))">false</CopyBuildsToSteam>
+	    <CopyBuildsToEpic Condition="$(BettrFGPromptOut.Contains('EPIC=1'))">true</CopyBuildsToEpic>
+	    <CopyBuildsToEpic Condition="$(BettrFGPromptOut.Contains('EPIC=0'))">false</CopyBuildsToEpic>
+	    <CopyBuildsToDownloads Condition="$(BettrFGPromptOut.Contains('DL=1'))">true</CopyBuildsToDownloads>
+	    <CopyBuildsToDownloads Condition="$(BettrFGPromptOut.Contains('DL=0'))">false</CopyBuildsToDownloads>
+	    <BettrFGDownloadsFlag Condition="$(BettrFGPromptOut.Contains('DL=1'))">-CopyBuildsToDownloads</BettrFGDownloadsFlag>
+	    <BettrFGDownloadsFlag Condition="$(BettrFGPromptOut.Contains('DL=0'))"></BettrFGDownloadsFlag>
+	    <KillAndRestartGame Condition="$(BettrFGPromptOut.Contains('KILL=0'))">false</KillAndRestartGame>
+	    <SkipLaunch Condition="$(BettrFGPromptOut.Contains('KILL=0'))">true</SkipLaunch>
+	  </PropertyGroup>
+	  <Message Importance="high" Text="BettrFG build choices: $(BettrFGPromptOut)" />
+	</Target>
+
 	<Target Name="CopyNAudio" AfterTargets="Build">
 	  <Copy SourceFiles="$(NuGetPackageRoot)naudio.core\2.3.0\lib\netstandard2.0\NAudio.Core.dll" DestinationFolder="$(OutDir)" />
 	  <Copy SourceFiles="$(NuGetPackageRoot)naudio.winmm\2.3.0\lib\netstandard2.0\NAudio.WinMM.dll" DestinationFolder="$(OutDir)" />
