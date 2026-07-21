@@ -23,6 +23,16 @@ This repo holds the installer and source for BettrFG, the Fall Guys mod that aim
 ### Discord server:
 http://dsc.gg/bettrfg
 
+# Installation
+
+<img width="789" height="556" alt="image" src="https://github.com/user-attachments/assets/cc8657a0-484a-464c-acf2-cd93a29bbe94" />
+
+#### Step 1: Get the installer from [here](https://github.com/oreytv/BettrFG/releases/tag/installer)
+#### Step 2: Open the installer's executable file
+#### Step 3: Select the installation location of your choice for the mod
+#### Step 4: Choose whether to install latest, specific version, or uninstall etc.
+
+
 # Features
 - Custom UGC skins and accessories
 - Nametag customization
@@ -32,8 +42,8 @@ http://dsc.gg/bettrfg
 - In-game time/points leaderboard
 - and more
 
-# Skin creation
-- https://youtu.be/QwjHGslCnnM guide
+# UGC creation
+- The mod does not yet consist of proper documentation. But it has a playlist for tutorials [here](https://www.youtube.com/playlist?list=PLAPN34Bm_MDFu7KDBP4NOARk07Mj7ybp8)
 - [Download base rig.blend](https://github.com/oreytv/BettrFG/raw/refs/heads/main/assets/base%20rig.blend)
 - Unity https://unity.com/releases/editor/whats-new/2021.3.16f1
 
