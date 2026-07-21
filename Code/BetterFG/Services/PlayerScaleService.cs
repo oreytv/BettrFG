@@ -269,6 +269,9 @@ namespace BetterFG.Services
         private static bool IsInRoundBean(GameObject bean)
         {
             if (bean == null) return false;
+            // creative's bean is a clone parented under the editor hierarchy, so the root/name test
+            // below misses it and it'd get scaled on its root instead of the wrapper
+            if (bean.name == "LevelEditor_FallGuy(Clone)") return true;
             return bean.transform.parent == null && bean.name.StartsWith("FallGuy");
         }
     }

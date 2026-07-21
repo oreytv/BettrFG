@@ -127,7 +127,8 @@ namespace BetterFG.Patches
             if (__instance.TryCast<LevelEditorParameterMenuViewModel>() != null)
             {
                 CreativeUIPatches.FixParametersMenu(__instance.transform);
-                inst.StartCoroutine(ApplyCreativeNextFrame(__instance.transform, true, null, false).WrapToIl2Cpp());
+                // a colour row can sit anywhere in the list; its swatch is the live picked colour, leave it
+                inst.StartCoroutine(ApplyCreativeNextFrame(__instance.transform, true, "UI_ColorPickerSwatch_Prefab", false).WrapToIl2Cpp());
                 return;
             }
 
@@ -142,6 +143,14 @@ namespace BetterFG.Patches
             if (__instance.TryCast<LevelEditorRulebookViewModel>() != null)
             {
                 ApplyCreativeNow(__instance.transform, null, true);
+                return;
+            }
+
+            // colour picker: panel chrome only. Swatches/Colors/ColorPickSliders ARE the colour previews,
+            // so recolouring them would lie about what you're picking.
+            if (__instance.TryCast<LevelEditorColourPickerParameterViewModel>() != null)
+            {
+                inst.ReapplyForegroundFromSettings(__instance.transform, "Swatches|Colors|ColorPickSliders", true);
                 return;
             }
 

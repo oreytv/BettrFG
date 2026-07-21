@@ -63,6 +63,21 @@ namespace BetterFG.UI.Windows.Creative
             return null;
         }
 
+        // only decals/stickers carry this one, so its presence is also how the window decides whether
+        // to offer the lighting row at all.
+        public static LevelEditorUnlitModeParameter GetUnlitParam(LevelEditorPlaceableObject obj)
+        {
+            if (obj == null) return null;
+            var handlers = obj.GetComponentsInChildren<LevelEditorPlaceableParameterHandler>(true);
+            if (handlers == null) return null;
+            for (int i = 0; i < handlers.Length; i++)
+            {
+                var u = handlers[i]?.TryCast<LevelEditorUnlitModeParameter>();
+                if (u != null) return u;
+            }
+            return null;
+        }
+
         // read the object's CURRENT colour/surface/visibility/collision into `into`, but only for the
         // fields `template` carries — used to build an inverse snapshot for redo (see BatchEditHistory).
         public static void SnapCurrent(LevelEditorPlaceableObject obj,
@@ -87,6 +102,11 @@ namespace BetterFG.UI.Windows.Creative
             {
                 var col = GetCollisionParam(obj);
                 if (col != null) into.CollisionEnabled = col.GetCollisionParam();
+            }
+            if (template.Unlit.HasValue)
+            {
+                var unlit = GetUnlitParam(obj);
+                if (unlit != null) into.Unlit = unlit._unlitMode;
             }
         }
 
@@ -121,6 +141,21 @@ namespace BetterFG.UI.Windows.Creative
                 var col = GetCollisionParam(obj);
                 if (col != null) { col._collisionEnabled = snap.CollisionEnabled.Value; col.ApplyCollisionParam(true); }
             }
+            if (snap.Unlit.HasValue)
+            {
+                var unlit = GetUnlitParam(obj);
+                if (unlit != null) ApplyUnlit(unlit, snap.Unlit.Value);
+            }
+        }
+
+        // same trick as the surface param: write the state fields ourselves and push straight to the
+        // responders (the LevelEditorDecal), instead of going through SetValue and its UI refresh.
+        // _currentVal is what Write() persists into the UGC schema, _unlitMode is what the param reads back.
+        public static void ApplyUnlit(LevelEditorUnlitModeParameter unlit, bool enabled)
+        {
+            unlit._currentVal = enabled;
+            unlit._unlitMode = enabled;
+            unlit.SetUnlitMode(enabled);
         }
 
         // apply a surface SO directly and set the selected-index backing field, bypassing

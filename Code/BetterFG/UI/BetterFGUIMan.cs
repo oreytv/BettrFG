@@ -81,6 +81,9 @@ namespace BetterFG.UI
 
         public bool IsShown => _cg != null && _cg.alpha > 0f;
 
+        // height after SetText has sized it, so callers pinning it to something can clear that thing
+        public float Height => _rt != null ? _rt.sizeDelta.y : 0f;
+
         private RectTransform _canvasRt;
 
         public void FollowMouse(Canvas canvas)
@@ -137,7 +140,9 @@ namespace BetterFG.UI
             return null;
         }
 
-        private static BetterFGTab NewTab<T>() where T : BetterFGTab
+        // build a tab instance directly by type — used for drill-in tabs that aren't registered (so
+        // they never appear in the slot dropdown) but are reached from an in-tab button.
+        public static T NewTab<T>() where T : BetterFGTab
         {
             var go = new GameObject("BetterFG_" + typeof(T).Name);
             go.hideFlags = HideFlags.HideAndDontSave;
@@ -858,6 +863,19 @@ namespace BetterFG.UI
             return null;
         }
 
+        // swap the slot a tab lives in for a fresh instance of another tab type and open it. used for
+        // drill-in tabs like Creative <-> "Creative - Custom Textures" that aren't in the tab registry
+        // (so they never show in the slot dropdown) and are reached only via an in-tab button. not
+        // saved: on relaunch the slot restores to whatever registered tab was there.
+        public BetterFGTab SwitchSlotTab(BetterFGTab from, BetterFGTab replacement)
+        {
+            int slot = _tabs.IndexOf(from);
+            if (slot < 0 || replacement == null) return null;
+            AddTabToSlot(slot, replacement);   // destroys `from`
+            if (_openTab != replacement) ToggleTab(replacement);
+            return replacement;
+        }
+
         // ── Tab toggle ────────────────────────────────────────────────────────
         public void ToggleTab(BetterFGTab tab)
         {
@@ -875,6 +893,7 @@ namespace BetterFG.UI
                 AudioService.PlayTabOpen();
                 tab.IsOpen = true;
                 _openTab = tab;
+                tab.SetContentActive(true); // wake the content before it slides in
                 AnimateTab(tab, toOpen: true);
                 tab.OnOpened();
             }
@@ -1002,6 +1021,9 @@ namespace BetterFG.UI
                 yield return null;
             }
             rt.anchoredPosition = new Vector2(rt.anchoredPosition.x, targetY);
+
+            // once the tab has finished sliding back down, disable its content so it isn't repainted
+            if (!toOpen && tab != null) tab.SetContentActive(false);
         }
 
         // ── UI scale confirm ────────────────────────────────────────────────────
@@ -1100,6 +1122,21 @@ namespace BetterFG.UI
             _tooltip.SetVisible(true);
             int gen = ++_timedTipGen;
             StartCoroutine(HideTooltipAfter(gen, seconds).WrapToIl2Cpp());
+        }
+
+        // same tooltip, pinned just above a UI element somewhere else (a game menu row, say) instead of
+        // following the cursor. pass the element's TOP-edge world position; it sits clear of it rather
+        // than covering it, which needs the height only known once the text has been laid out.
+        public void ShowTooltipOver(string text, Vector3 topWorldPos, float seconds)
+        {
+            if (_tooltip == null || _overlayCanvas == null) return;
+            var canvasRt = _overlayCanvas.GetComponent<RectTransform>();
+            if (canvasRt == null) return;
+            var screen = RectTransformUtility.WorldToScreenPoint(null, topWorldPos);
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                canvasRt, screen, _overlayCanvas.worldCamera, out var local);
+            ShowTooltipFixed(text, local, seconds);
+            _tooltip.SetFixed(true, local + new Vector2(0f, _tooltip.Height * 0.5f + 8f));
         }
 
         private IEnumerator HideTooltipAfter(int gen, float seconds)

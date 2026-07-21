@@ -46,6 +46,20 @@ namespace BetterFG.Features.UnityRound.Editor
         // true while we're sat in the level editor (creative). the Creative tab reads this.
         public static bool InLevelEditor;
 
+        // live "keep the editor's own placeables/background visible" toggle. normally comes from
+        // info.json's keepExistingObjects; the Creative tab's Configuration step flips it at runtime.
+        public static bool KeepExistingObjects { get; private set; }
+
+        // re-run the creative-object cull with the new keep flag. restore first so a false->true->false
+        // walk doesn't leave anything double-disabled or stuck on.
+        public static void SetKeepExistingObjects(bool keep)
+        {
+            KeepExistingObjects = keep;
+            if (_spawned == null) return;
+            BetterFGRoundPostmodifier.RestoreCreativeModeObjects();
+            BetterFGRoundPostmodifier.DisableCreativeModeObjects(disablePlaceables: true, keepExisting: keep);
+        }
+
         // ── share code in the level description ──────────────────────────────────
         // the level editor description field rejects raw <color> tags, so we wrap them in LRM marks
         // (U+200E, invisible) which lets them through. format written into the description:
@@ -176,6 +190,7 @@ namespace BetterFG.Features.UnityRound.Editor
 
             _spawned = instance;
             _loadedJsonPath = jsonPath;
+            KeepExistingObjects = info.keepExistingObjects;
 
             // snapshot render settings before Apply clobbers them, so Unload can restore
             CacheEnvironmentOnce();

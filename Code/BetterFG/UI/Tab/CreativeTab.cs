@@ -1,6 +1,4 @@
 ﻿using System;
-using System.IO;
-using System.Collections.Generic;
 using System.Reflection;
 using BetterFG.Features.CreativeIncrements;
 using BetterFG.Features.UnityRound.Editor;
@@ -36,19 +34,28 @@ namespace BetterFG.UI.Tab
         private static readonly Color BTN_BLUE = new Color(0.22f, 0.34f, 0.55f, 1f);
         private static readonly Color BTN_GREEN = new Color(0.25f, 0.5f, 0.25f, 1f);
         private static readonly Color BTN_RED = new Color(0.45f, 0.25f, 0.25f, 1f);
-        private static readonly Color ROW_SEL = new Color(0.25f, 0.45f, 0.25f, 1f);
-        private static readonly Color ROW_EVEN = new Color(1f, 1f, 1f, 0.04f);
 
         private const string PATH_KEY = "unityround.editor.jsonpath";
         private const string SHARE_URL_KEY = "unityround.editor.shareurl";
-        private static float ROW_H => 26f * UIScale.S;
 
-        private enum SubTab { Load, Textures, Args }
-        private SubTab _sub = SubTab.Load;
-        private Button _btnLoad, _btnTex, _btnArgs;
-        private GameObject _bodyRoot, _loadPanel, _texPanel, _argsPanel, _notInCreative;
+        private enum SubTab { Args, UnityRound }
+        // remembered across rebuilds so drilling into the Custom Textures tab and coming back lands
+        // you on the same subtab + wizard step you left (a rebuilt tab is a fresh instance)
+        private static SubTab _lastSub = SubTab.Args;
+        private SubTab _sub = _lastSub;
+        private Button _btnArgs, _btnRound;
+        private GameObject _bodyRoot, _argsPanel, _roundPanel, _notInCreative;
 
-        // load panel
+        // Unity Round subtab is a 3-step wizard: Load -> Configuration -> Publish.
+        private enum Step { Load, Config, Publish }
+        private static Step _lastStep = Step.Load;
+        private Step _step = _lastStep;
+        private static readonly string[] StepTitles = { "Load round", "Configuration", "Publish" };
+        private GameObject _loadStep, _configStep, _publishStep;
+        private Text _stepHeader;
+        private Button _backBtn, _nextBtn;
+
+        // load step
         private InputField _pathField;
         private Text _statusLabel;
         // share-code section: paste an info.json url, get the owner/repo/round_xxx string to put in
@@ -59,16 +66,14 @@ namespace BetterFG.UI.Tab
         // args panel
         private Button _incToggle, _batchToggle;
 
-        // textures panel
-        private List<string> _texNames = new List<string>();
-        private int _texSelected = -1;
-        private Text _texStatus;
-        private RectTransform _texContentRt;
+        // config step
+        private Button _keepToggle;
 
         private static Texture2D _bgTex;
         private static Texture2D _hoverTex;
         private GameObject _bgHoverGo;
         private bool _wasInEditor;
+        private bool _wasSpawned;
 
         // ── background (same as the other tabs) ───────────────────────────────
 
@@ -93,7 +98,7 @@ namespace BetterFG.UI.Tab
 
         protected override void BuildBackground(RectTransform root)
         {
-            var bgTex = LoadTex("BetterFG.assets.ui.tab.menu.png", ref _bgTex);
+            var bgTex = LoadTex("BetterFG.assets.ui.tab.creative.png", ref _bgTex);
             if (bgTex == null) return;
 
             var bgGo = new GameObject("BG");
@@ -136,13 +141,11 @@ namespace BetterFG.UI.Tab
             float y = VPAD;
 
             // subtab bar
-            float third = (w - PAD) / 3f;
-            _btnLoad = UGUIShip.CreateButton(contentRoot, new Rect(PAD, y, third, subTabH),
-                "Load", _sub == SubTab.Load ? SEL_COLOR : BTN_DARK, WHITE, FS_SM, new Action(() => SetSub(SubTab.Load)));
-            _btnTex = UGUIShip.CreateButton(contentRoot, new Rect(PAD + third + PAD * 0.5f, y, third, subTabH),
-                "Custom Textures", _sub == SubTab.Textures ? SEL_COLOR : BTN_DARK, WHITE, FS_SM, new Action(() => SetSub(SubTab.Textures)));
-            _btnArgs = UGUIShip.CreateButton(contentRoot, new Rect(PAD + (third + PAD * 0.5f) * 2f, y, third, subTabH),
+            float half = (w - PAD * 0.5f) / 2f;
+            _btnArgs = UGUIShip.CreateButton(contentRoot, new Rect(PAD, y, half, subTabH),
                 "Args", _sub == SubTab.Args ? SEL_COLOR : BTN_DARK, WHITE, FS_SM, new Action(() => SetSub(SubTab.Args)));
+            _btnRound = UGUIShip.CreateButton(contentRoot, new Rect(PAD + half + PAD * 0.5f, y, half, subTabH),
+                "Unity Round", _sub == SubTab.UnityRound ? SEL_COLOR : BTN_DARK, WHITE, FS_SM, new Action(() => SetSub(SubTab.UnityRound)));
             y += subTabH + SH;
 
             UGUIShip.CreatePanel(contentRoot, new Rect(PAD, y, w, 1f), new Color(1f, 1f, 1f, 0.06f));
@@ -152,14 +155,11 @@ namespace BetterFG.UI.Tab
 
             _bodyRoot = MakePanel(contentRoot, y, bodyH);
 
-            _loadPanel = MakePanel(_bodyRoot.GetComponent<RectTransform>(), 0f, bodyH);
-            BuildLoadPanel(_loadPanel.GetComponent<RectTransform>(), w, bodyH);
-
-            _texPanel = MakePanel(_bodyRoot.GetComponent<RectTransform>(), 0f, bodyH);
-            BuildTexPanel(_texPanel.GetComponent<RectTransform>(), w, bodyH);
-
             _argsPanel = MakePanel(_bodyRoot.GetComponent<RectTransform>(), 0f, bodyH);
             BuildArgsPanel(_argsPanel.GetComponent<RectTransform>(), w, bodyH);
+
+            _roundPanel = MakePanel(_bodyRoot.GetComponent<RectTransform>(), 0f, bodyH);
+            BuildRoundWizard(_roundPanel.GetComponent<RectTransform>(), w, bodyH);
 
             // "not in creative" message, shown over everything when out of the editor
             _notInCreative = MakePanel(contentRoot, y, bodyH);
@@ -184,10 +184,9 @@ namespace BetterFG.UI.Tab
 
         void SetSub(SubTab sub)
         {
-            _sub = sub;
-            UGUIShip.SetButtonSelected(_btnLoad, sub == SubTab.Load, SEL_COLOR);
-            UGUIShip.SetButtonSelected(_btnTex, sub == SubTab.Textures, SEL_COLOR);
+            _sub = _lastSub = sub;
             UGUIShip.SetButtonSelected(_btnArgs, sub == SubTab.Args, SEL_COLOR);
+            UGUIShip.SetButtonSelected(_btnRound, sub == SubTab.UnityRound, SEL_COLOR);
             Refresh();
         }
 
@@ -196,54 +195,91 @@ namespace BetterFG.UI.Tab
             bool inEditor = UnityRoundLoader.InLevelEditor;
 
             // out of creative: hide the subtab bar + body entirely, just show the message
-            _btnLoad.gameObject.SetActive(inEditor);
-            _btnTex.gameObject.SetActive(inEditor);
             _btnArgs.gameObject.SetActive(inEditor);
+            _btnRound.gameObject.SetActive(inEditor);
             _bodyRoot.SetActive(inEditor);
             _notInCreative.SetActive(!inEditor);
 
             if (!inEditor) return;
-            _loadPanel.SetActive(_sub == SubTab.Load);
-            _texPanel.SetActive(_sub == SubTab.Textures);
             _argsPanel.SetActive(_sub == SubTab.Args);
+            _roundPanel.SetActive(_sub == SubTab.UnityRound);
+
+            if (_sub == SubTab.UnityRound) RefreshWizard();
+        }
+
+        // ── Unity Round wizard nav ────────────────────────────────────────────────
+
+        void RefreshWizard()
+        {
+            bool hasRound = UnityRoundLoader.HasSpawned;
+
+            // steps past Load need a round loaded; snap back to Load if it went away under us
+            if (_step != Step.Load && !hasRound) _step = Step.Load;
+
+            _loadStep.SetActive(_step == Step.Load);
+            _configStep.SetActive(_step == Step.Config);
+            _publishStep.SetActive(_step == Step.Publish);
+
+            _stepHeader.text = $"Step {(int)_step + 1} of 3  —  {StepTitles[(int)_step]}";
+
+            _backBtn.gameObject.SetActive(_step != Step.Load);
+
+            bool isLast = _step == Step.Publish;
+            _nextBtn.gameObject.SetActive(!isLast);
+            // can't leave Load until a round is actually loaded
+            bool canNext = _step != Step.Load || hasRound;
+            _nextBtn.interactable = canNext;
+            var nlbl = _nextBtn.GetComponentInChildren<Text>();
+            if (nlbl != null) nlbl.color = canNext ? WHITE : HINT;
+        }
+
+        void GoStep(int delta)
+        {
+            int next = Mathf.Clamp((int)_step + delta, 0, 2);
+            if ((next == (int)Step.Config || next == (int)Step.Publish) && !UnityRoundLoader.HasSpawned) return; // gated
+            _step = _lastStep = (Step)next;
+            RefreshWizard();
         }
 
         void Update()
         {
-            if (UnityRoundLoader.InLevelEditor != _wasInEditor)
+            // re-refresh on entering/leaving the editor AND on a round loading/unloading — the
+            // wizard gates its later steps on a round being present.
+            if (UnityRoundLoader.InLevelEditor != _wasInEditor || UnityRoundLoader.HasSpawned != _wasSpawned)
             {
                 _wasInEditor = UnityRoundLoader.InLevelEditor;
-                if (_wasInEditor) RescanTextures();
+                _wasSpawned = UnityRoundLoader.HasSpawned;
                 Refresh();
-            }
-
-            // texture subtab hotkeys: Enter picks a png for the selected row, Shift saves it out
-            if (!IsOpen || !UnityRoundLoader.InLevelEditor || _sub != SubTab.Textures) return;
-            if (_texSelected < 0 || _texSelected >= _texNames.Count) return;
-
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
-            {
-                string texName = _texNames[_texSelected];
-                WinDialogs.PickPng("Select PNG for " + texName, path =>
-                {
-                    if (string.IsNullOrEmpty(path)) { SetTexStatus("cancelled", HINT); return; }
-                    if (ObstacleTextureLoader.SetOverride(texName, path, out string error)) SetTexStatus("set " + texName, OK);
-                    else SetTexStatus("error: " + error, ERR);
-                    RebuildTexRows();
-                });
-            }
-
-            if (Input.GetKeyDown(KeyCode.LeftShift) || Input.GetKeyDown(KeyCode.RightShift))
-            {
-                string texName = _texNames[_texSelected];
-                if (ObstacleTextureLoader.SaveTexturePng(texName, out string path, out string error)) SetTexStatus("saved " + Path.GetFileName(path), OK);
-                else SetTexStatus("error: " + error, ERR);
             }
         }
 
-        // ── Load panel ──────────────────────────────────────────────────────────
+        // ── Unity Round wizard ────────────────────────────────────────────────────
 
-        void BuildLoadPanel(RectTransform root, float w, float bodyH)
+        void BuildRoundWizard(RectTransform root, float w, float bodyH)
+        {
+            float rh = UIScale.LH;
+            float navH = BTN_H;
+
+            _stepHeader = UGUIShip.CreateLabel(root.transform, new Rect(PAD, SH, w, rh), "", FS_SM, new Color(1f, 1f, 1f, 0.72f));
+
+            // step body sits between the header and the nav bar
+            float bodyY = SH + rh + SH;
+            float stepH = bodyH - bodyY - navH - SH;
+
+            _loadStep = MakePanel(root, bodyY, stepH);
+            BuildLoadStep(_loadStep.GetComponent<RectTransform>(), w, stepH);
+            _configStep = MakePanel(root, bodyY, stepH);
+            BuildConfigStep(_configStep.GetComponent<RectTransform>(), w, stepH);
+            _publishStep = MakePanel(root, bodyY, stepH);
+            BuildPublishStep(_publishStep.GetComponent<RectTransform>(), w, stepH);
+
+            float navY = bodyH - navH;
+            float bw = (w - PAD) / 2f;
+            _backBtn = UGUIShip.CreateButton(root.transform, new Rect(PAD, navY, bw, navH), "< BACK", BTN_DARK, WHITE, FS_SM, new Action(() => GoStep(-1)));
+            _nextBtn = UGUIShip.CreateButton(root.transform, new Rect(PAD + bw + PAD * 0.5f, navY, bw, navH), "NEXT >", BTN_BLUE, WHITE, FS_SM, new Action(() => GoStep(1)));
+        }
+
+        void BuildLoadStep(RectTransform root, float w, float bodyH)
         {
             float cy = SH;
             float rh = UIScale.LH;
@@ -262,7 +298,6 @@ namespace BetterFG.UI.Tab
                 "BROWSE", BTN_BLUE, WHITE, FS_SM, new Action(OnBrowse));
             cy += BTN_H + SH;
 
-            // load / unload right under the path field
             float bw = (w - PAD) / 2f;
             UGUIShip.CreateButton(root.transform, new Rect(PAD, cy, bw, BTN_H), "LOAD", BTN_GREEN, WHITE, FS, new Action(OnLoad));
             UGUIShip.CreateButton(root.transform, new Rect(PAD + bw + PAD * 0.5f, cy, bw, BTN_H), "UNLOAD", BTN_RED, WHITE, FS, new Action(OnUnload));
@@ -271,13 +306,64 @@ namespace BetterFG.UI.Tab
             _statusLabel = UGUIShip.CreateLabel(root.transform, new Rect(PAD, cy, w, rh),
                 UnityRoundLoader.HasSpawned ? $"loaded: {UnityRoundLoader.Spawned?.name}" : "",
                 FS_SM, UnityRoundLoader.HasSpawned ? OK : HINT);
+        }
+
+        // step 2: things that used to need a json edit or a Unity rebuild — live now.
+        void BuildConfigStep(RectTransform root, float w, float bodyH)
+        {
+            float cy = SH;
+            float rh = UIScale.LH;
+            float tglW = 70f * UIScale.S;
+
+            UGUIShip.CreateLabel(root.transform, new Rect(PAD, cy, w - tglW - PAD, BTN_H), "Show existing creative objects", FS_SM, WHITE, TextAnchor.MiddleLeft);
+            bool keep = UnityRoundLoader.KeepExistingObjects;
+            _keepToggle = UGUIShip.CreateButton(root.transform, new Rect(PAD + w - tglW, cy, tglW, BTN_H),
+                keep ? "ON" : "OFF", keep ? BTN_GREEN : BTN_DARK, WHITE, FS_SM, new Action(() =>
+                {
+                    bool next = !UnityRoundLoader.KeepExistingObjects;
+                    UnityRoundLoader.SetKeepExistingObjects(next);
+                    UGUIShip.SetButtonSelected(_keepToggle, next, BTN_GREEN);
+                    var lbl = _keepToggle.GetComponentInChildren<Text>();
+                    if (lbl != null) lbl.text = next ? "ON" : "OFF";
+                }));
+            cy += BTN_H + SH * 2f;
+
+            UGUIShip.CreateLabel(root.transform, new Rect(PAD, cy, w, rh), "Ambient light", FS_SM, new Color(1f, 1f, 1f, 0.72f));
+            cy += rh + SH;
+            UGUIShip.CreateColorControls(root.transform, PAD, ref cy, w,
+                () => RenderSettings.ambientLight.r, () => RenderSettings.ambientLight.g, () => RenderSettings.ambientLight.b,
+                r => SetAmbient(0, r), g => SetAmbient(1, g), b => SetAmbient(2, b), () => { },
+                out _, out _, out _);
+            cy += SH;
+
+            UGUIShip.CreateLabel(root.transform, new Rect(PAD, cy, w, rh), "Reflection intensity", FS_SM, new Color(1f, 1f, 1f, 0.72f));
+            cy += rh + SH;
+            UGUIShip.CreateSlider(root.transform, PAD, cy, w, "", RenderSettings.reflectionIntensity, rh, PAD, FS_SM,
+                v => RenderSettings.reflectionIntensity = v, null, null, false);
             cy += rh + SH * 2f;
 
-            UGUIShip.CreatePanel(root.transform, new Rect(PAD, cy, w, 1f), new Color(1f, 1f, 1f, 0.06f));
-            cy += 1f + SH * 2f;
+            // custom textures live in their own drill-in tab; here it's a button + applied count
+            UGUIShip.CreateButton(root.transform, new Rect(PAD, cy, w, BTN_H), "Custom textures", BTN_DARK, WHITE, FS_SM,
+                new Action(() => BetterFGUIMan.Instance?.SwitchSlotTab(this, BetterFGTabRegistry.NewTab<CustomCreativeTextureTab>())));
+            cy += BTN_H + SH;
+            int n = ObstacleTextureLoader.Overrides.Count;
+            UGUIShip.CreateLabel(root.transform, new Rect(PAD, cy, w, rh),
+                n == 0 ? "no custom textures applied" : $"{n} custom texture{(n == 1 ? "" : "s")} applied", FS_SM, HINT);
+        }
 
-            // ── publish: paste your level's github info.json link, write it into the description ──
-            UGUIShip.CreateLabel(root.transform, new Rect(PAD, cy, w, rh), "Publish (put your level's info.json on github, paste link)", FS_SM, new Color(1f, 1f, 1f, 0.72f));
+        void SetAmbient(int ch, float v)
+        {
+            var c = RenderSettings.ambientLight;
+            if (ch == 0) c.r = v; else if (ch == 1) c.g = v; else c.b = v;
+            RenderSettings.ambientLight = c;
+        }
+
+        void BuildPublishStep(RectTransform root, float w, float bodyH)
+        {
+            float cy = SH;
+            float rh = UIScale.LH;
+
+            UGUIShip.CreateLabel(root.transform, new Rect(PAD, cy, w, rh), "Put your level's info.json on github, paste the link", FS_SM, new Color(1f, 1f, 1f, 0.72f));
             cy += rh + SH;
 
             _shareUrlField = UGUIShip.CreateInputField(root.transform, new Rect(PAD, cy, w, BTN_H),
@@ -361,10 +447,7 @@ namespace BetterFG.UI.Tab
             string path = _pathField != null ? _pathField.text : SettingsService.Get(PATH_KEY, "");
             SettingsService.Set(PATH_KEY, path ?? "");
             if (UnityRoundLoader.LoadFromInfoJson(path, out string error))
-            {
                 SetStatus($"loaded: {UnityRoundLoader.Spawned?.name}", OK);
-                RescanTextures();
-            }
             else SetStatus($"error: {error}", ERR);
         }
 
@@ -457,130 +540,5 @@ namespace BetterFG.UI.Tab
                 "reopen a parameter menu to apply. generates 0 to max in your step.", FS_SM, HINT);
         }
 
-        // ── Custom Textures panel ───────────────────────────────────────────────
-
-        void BuildTexPanel(RectTransform root, float w, float bodyH)
-        {
-            float rh = UIScale.LH;
-            UGUIShip.CreateLabel(root.transform, new Rect(PAD, SH, w, rh),
-                "Obstacle textures  (Enter=set PNG, Shift=save PNG)", FS_SM, new Color(1f, 1f, 1f, 0.72f));
-
-            float listY = SH + rh + SH;
-            float listH = bodyH - listY - BTN_H - PAD;
-
-            var scrollGo = new GameObject("Scroll");
-            scrollGo.transform.SetParent(root.transform, false);
-            var scrollRt = scrollGo.AddComponent<RectTransform>();
-            UGUIShip.SetPixelRect(scrollRt, new Rect(PAD, listY, w, listH));
-            scrollGo.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0.25f);
-
-            var scroll = scrollGo.AddComponent<ScrollRect>();
-            scroll.horizontal = false;
-            scroll.vertical = true;
-            scroll.movementType = ScrollRect.MovementType.Clamped;
-
-            var vpGo = new GameObject("Viewport");
-            vpGo.transform.SetParent(scrollGo.transform, false);
-            var vpRt = vpGo.AddComponent<RectTransform>();
-            vpRt.anchorMin = Vector2.zero; vpRt.anchorMax = Vector2.one;
-            vpRt.offsetMin = vpRt.offsetMax = Vector2.zero;
-            vpGo.AddComponent<RectMask2D>();
-            scroll.viewport = vpRt;
-
-            var listGo = new GameObject("List");
-            listGo.transform.SetParent(vpGo.transform, false);
-            _texContentRt = listGo.AddComponent<RectTransform>();
-            _texContentRt.anchorMin = new Vector2(0f, 1f);
-            _texContentRt.anchorMax = new Vector2(1f, 1f);
-            _texContentRt.pivot = new Vector2(0.5f, 1f);
-            _texContentRt.offsetMin = _texContentRt.offsetMax = Vector2.zero;
-            var layout = listGo.AddComponent<VerticalLayoutGroup>();
-            layout.childForceExpandWidth = true;
-            layout.childForceExpandHeight = false;
-            layout.spacing = 0f;
-            listGo.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            scroll.content = _texContentRt;
-
-            float refreshW = 80f * UIScale.S;
-            _texStatus = UGUIShip.CreateLabel(root.transform, new Rect(PAD, bodyH - BTN_H, w - refreshW - PAD, BTN_H), "", FS_SM, HINT);
-            UGUIShip.CreateButton(root.transform, new Rect(PAD + w - refreshW, bodyH - BTN_H, refreshW, BTN_H),
-                "REFRESH", BTN_BLUE, WHITE, FS_SM, new Action(() => { RescanTextures(); SetTexStatus($"found {_texNames.Count}", HINT); }));
-
-            RebuildTexRows();
-        }
-
-        void RescanTextures()
-        {
-            _texNames = ObstacleTextureLoader.DiscoverTextureNames();
-            if (_texSelected >= _texNames.Count) _texSelected = -1;
-            RebuildTexRows();
-        }
-
-        void RebuildTexRows()
-        {
-            if (_texContentRt == null) return;
-            for (int i = _texContentRt.childCount - 1; i >= 0; i--)
-                UnityEngine.Object.Destroy(_texContentRt.GetChild(i).gameObject);
-
-            if (_texNames.Count == 0)
-            {
-                UGUIShip.CreateLabel(_texContentRt, new Rect(PAD, 0f, TabWidth, ROW_H), "no placeable textures found — load a round first", FS_SM, HINT);
-                return;
-            }
-            for (int i = 0; i < _texNames.Count; i++)
-                BuildTexRow(i);
-        }
-
-        void BuildTexRow(int idx)
-        {
-            string texName = _texNames[idx];
-            bool hasOverride = ObstacleTextureLoader.Overrides.ContainsKey(texName);
-            bool isSel = idx == _texSelected;
-
-            var rowGo = new GameObject("Row_" + idx);
-            rowGo.transform.SetParent(_texContentRt, false);
-            var le = rowGo.AddComponent<LayoutElement>();
-            le.preferredHeight = ROW_H;
-            le.flexibleWidth = 1f;
-            rowGo.AddComponent<Image>().color = isSel ? ROW_SEL : (idx % 2 == 0 ? ROW_EVEN : new Color(0f, 0f, 0f, 0f));
-
-            int captured = idx;
-            var btn = rowGo.AddComponent<Button>();
-            var nav = btn.navigation; nav.mode = Navigation.Mode.None; btn.navigation = nav;
-            btn.transition = Selectable.Transition.None;
-            btn.onClick.AddListener(new Action(() => { _texSelected = _texSelected == captured ? -1 : captured; RebuildTexRows(); }));
-
-            float w = TabWidth - PAD * 2f;
-            float thumb = ROW_H - 4f;
-            var thumbGo = new GameObject("Thumb");
-            thumbGo.transform.SetParent(rowGo.transform, false);
-            var thumbRt = thumbGo.AddComponent<RectTransform>();
-            UGUIShip.SetPixelRect(thumbRt, new Rect(4f, 2f, thumb, thumb));
-            var raw = thumbGo.AddComponent<RawImage>();
-            raw.raycastTarget = false;
-            var liveTex = ObstacleTextureLoader.GetCurrentTexture(texName);
-            if (liveTex != null) raw.texture = liveTex;
-            else raw.color = new Color(0f, 0f, 0f, 0.4f);
-
-            float nameX = 4f + thumb + 6f;
-            float rmW = 24f * UIScale.S;
-            UGUIShip.CreateLabel(rowGo.transform, new Rect(nameX, 0f, w - rmW - nameX, ROW_H),
-                (hasOverride ? "● " : "") + texName, FS_SM, hasOverride ? OK : WHITE);
-
-            if (hasOverride)
-                UGUIShip.CreateButton(rowGo.transform, new Rect(w - rmW, 2f, rmW - 4f, ROW_H - 4f), "x", BTN_RED, WHITE, FS_SM, new Action(() =>
-                {
-                    ObstacleTextureLoader.RemoveOverride(texName);
-                    SetTexStatus("removed " + texName, HINT);
-                    RebuildTexRows();
-                }));
-        }
-
-        void SetTexStatus(string text, Color col)
-        {
-            if (_texStatus == null) return;
-            _texStatus.text = text;
-            _texStatus.color = col;
-        }
     }
 }

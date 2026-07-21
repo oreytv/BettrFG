@@ -7,7 +7,7 @@ using UnityEngine;
 namespace BetterFG.Customization.Social
 {
     /// <summary>
-    /// Persists PhraseEntry list to Settings/phrases.txt next to the DLL.
+    /// Persists PhraseEntry list to %APPDATA%\BettrFG\Settings\phrases.txt.
     /// Format: one entry per line, pipe-separated: id|phraseId|phraseText|slot|enabled|imagePath|sound0|sound1|sound2
     /// (old files had a single sound at index 6 — that still loads into sound slot 0)
     /// </summary>
@@ -18,9 +18,19 @@ namespace BetterFG.Customization.Social
 
         static PhraseSettingsService()
         {
-            string dll = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
-            Dir = Path.Combine(dll, "Settings");
+            string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            Dir = Path.Combine(appData, "BettrFG", "Settings");
             FilePath = Path.Combine(Dir, "phrases.txt");
+
+            string old = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "", "Settings", "phrases.txt");
+            if (!File.Exists(old)) return;
+            try
+            {
+                Directory.CreateDirectory(Dir);
+                if (!File.Exists(FilePath)) File.Copy(old, FilePath);
+                if (File.Exists(FilePath)) { File.Delete(old); Plugin.Log.LogInfo("moved phrases.txt into appdata"); }
+            }
+            catch (Exception ex) { Plugin.Log.LogWarning($"phrases.txt didn't migrate, left it where it was: {ex.Message}"); }
         }
 
         public static List<PhraseEntry> Load()

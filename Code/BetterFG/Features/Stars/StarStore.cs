@@ -8,7 +8,23 @@ namespace BetterFG.Features.Stars
 {
     internal static class StarStore
     {
-        static string FilePath => Path.Combine(Paths.ConfigPath, "betterfg_stars.json");
+        static readonly string FilePath;
+
+        static StarStore()
+        {
+            string appData = System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData);
+            FilePath = Path.Combine(appData, "BettrFG", "Settings", "betterfg_stars.json");
+
+            string old = Path.Combine(Paths.ConfigPath, "betterfg_stars.json");
+            if (!File.Exists(old)) return;
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(FilePath));
+                if (!File.Exists(FilePath)) File.Copy(old, FilePath);
+                if (File.Exists(FilePath)) { File.Delete(old); Plugin.Log.LogInfo("moved betterfg_stars.json into appdata"); }
+            }
+            catch (System.Exception ex) { Plugin.Log.LogWarning($"stars json didn't migrate, left it in config: {ex.Message}"); }
+        }
 
         static HashSet<string> _cleared;
 

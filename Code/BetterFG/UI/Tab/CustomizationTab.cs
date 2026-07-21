@@ -101,6 +101,9 @@ namespace BetterFG.UI.Tab
         // ── Textures ──────────────────────────────────────────────────────────
         private static Texture2D _hoverTex;
         private static Texture2D _bgTex;
+        private static Texture2D _repoOverlayTex;
+        private static Texture2D _importedTex;
+        private static Texture2D _featuredTex;
         private GameObject _bgHoverGo;
 
         private static Texture2D LoadTex(string resource, ref Texture2D cache)
@@ -482,8 +485,8 @@ namespace BetterFG.UI.Tab
             vlg.spacing = 2f;
             rowsGo.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-            // estimate height for layout: one row visible when closed
-            float estimatedH = BTN_H + 2f;
+            // estimate height for layout: one (tall) active row visible when closed
+            float estimatedH = RepoRowH + 2f;
             y += estimatedH + SH;
 
             return y;
@@ -501,13 +504,16 @@ namespace BetterFG.UI.Tab
 
             var activeRepo = repoRegistry.Active;
 
-            // Active row (always visible)
+            // Active row (always visible). tall image-on-top layout when a real repo (with cover) is selected;
+            // compact single line for the search bar, imported/featured, or no repo
+            bool activeTall = !_repoDropdownOpen && !_importedRepoSelected && !_featuredSelected && activeRepo != null;
+            float activeH = activeTall ? RepoRowH : BTN_H;
             var activeGo = new GameObject("RepoActiveRow");
             activeGo.transform.SetParent(_repoRowsParent, false);
             var activeRt = activeGo.AddComponent<RectTransform>();
-            activeRt.sizeDelta = new Vector2(0f, BTN_H);
+            activeRt.sizeDelta = new Vector2(0f, activeH);
             var activeLE = activeGo.AddComponent<LayoutElement>();
-            activeLE.preferredHeight = BTN_H;
+            activeLE.preferredHeight = activeH;
 
             var aHlg = activeGo.AddComponent<HorizontalLayoutGroup>();
             aHlg.childForceExpandHeight = true;
@@ -545,34 +551,27 @@ namespace BetterFG.UI.Tab
                     : activeRepo != null ? YELLOW : HINT;
                 var nameBtn = UGUIShip.CreateButton(activeGo.transform, activeLabelText,
                     BTN_DARK, activeLabelColor, FS_SM, new Action(() => { _repoDropdownOpen = true; _repoSearchQuery = ""; RefreshRepoRows(); }));
-                var nameLbl = nameBtn.transform.Find("Label")?.GetComponent<Text>();
-                if (nameLbl != null)
-                {
-                    nameLbl.alignment = TextAnchor.MiddleLeft;
-                    nameLbl.color = activeLabelColor;
-                    var nameLblRt = nameLbl.GetComponent<RectTransform>();
-                    if (nameLblRt != null) nameLblRt.offsetMin = new Vector2(14f, nameLblRt.offsetMin.y);
-                }
                 var nameLE = nameBtn.gameObject.GetComponent<LayoutElement>() ?? nameBtn.gameObject.AddComponent<LayoutElement>();
                 nameLE.flexibleWidth = 1f;
 
-                // cover stretches behind the name button only (not shown for imported repo)
-                var activeCoverGo = new GameObject("RepoCover");
-                activeCoverGo.transform.SetParent(nameBtn.transform, false);
-                activeCoverGo.transform.SetAsFirstSibling();
-                var activeCoverRt = activeCoverGo.AddComponent<RectTransform>();
-                activeCoverRt.anchorMin = Vector2.zero;
-                activeCoverRt.anchorMax = Vector2.one;
-                activeCoverRt.offsetMin = activeCoverRt.offsetMax = Vector2.zero;
-                var activeCoverImg = activeCoverGo.AddComponent<RawImage>();
-                activeCoverImg.color = new Color(1f, 1f, 1f, 0f);
-                activeCoverImg.raycastTarget = false;
-                if (!_importedRepoSelected && !_featuredSelected && activeRepo != null)
+                if (activeTall)
                 {
-                    _repoCoverImages[activeRepo.githubUrl] = activeCoverImg;
-                    var cachedTex = repoRegistry.GetCover(activeRepo);
-                    if (cachedTex != null) { activeCoverImg.texture = cachedTex; activeCoverImg.color = Color.white; }
-                    else repoRegistry.FetchCover(activeRepo);
+                    // real repo selected: tall cover-on-top layout, matching the dropdown entries
+                    BuildRepoButtonContents(nameBtn, activeRepo, showControls: false);
+                    var nameLbl = nameBtn.transform.Find("Label")?.GetComponent<Text>();
+                    if (nameLbl != null) nameLbl.color = activeLabelColor;
+                }
+                else
+                {
+                    // imported / featured / no repo: single-line label, no cover
+                    var nameLbl = nameBtn.transform.Find("Label")?.GetComponent<Text>();
+                    if (nameLbl != null)
+                    {
+                        nameLbl.alignment = TextAnchor.MiddleLeft;
+                        nameLbl.color = activeLabelColor;
+                        var nameLblRt = nameLbl.GetComponent<RectTransform>();
+                        if (nameLblRt != null) nameLblRt.offsetMin = new Vector2(14f, nameLblRt.offsetMin.y);
+                    }
                 }
             }
 
@@ -716,79 +715,130 @@ namespace BetterFG.UI.Tab
             if (label != null) label.color = on ? Color.black : WHITE;
         }
 
+        // repo covers are 532x38 banners; band fills the row width, height follows that aspect
+        private float RepoCoverW => TabWidth - PAD * 2f - 4f;
+        private float RepoCoverH => RepoCoverW * (38f / 532f);
+        // row is just the banner; name + remove/star overlay the cover along the bottom
+        private static float RepoStripH => BTN_H * 0.75f;
+        private float RepoRowH => RepoCoverH;
+
+        // full-height banner button filling a fresh row in the dropdown list
+        private Button CreateRepoRowButton(RectTransform parent, string goName, string label, Color labelColor, Action onClick)
+        {
+            var rowGo = new GameObject(goName);
+            rowGo.transform.SetParent(parent, false);
+            rowGo.AddComponent<RectTransform>().sizeDelta = new Vector2(0f, RepoRowH);
+            rowGo.AddComponent<LayoutElement>().preferredHeight = RepoRowH;
+
+            var btn = UGUIShip.CreateButton(rowGo.transform, label, BTN_DARK, labelColor, FS_SM, onClick);
+            MakeButtonScrollable(btn);
+            var rt = btn.GetComponent<RectTransform>();
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = rt.offsetMax = Vector2.zero;
+            return btn;
+        }
+
         // one selectable repo row inside the dropdown scroll content
         private void BuildRepoEntryRow(RectTransform parent, SkinRepo repo)
         {
-            var rowGo = new GameObject("RepoRow_" + repo.repoName);
-            rowGo.transform.SetParent(parent, false);
-            rowGo.AddComponent<RectTransform>().sizeDelta = new Vector2(0f, BTN_H);
-            rowGo.AddComponent<LayoutElement>().preferredHeight = BTN_H;
-
-            var hlg = rowGo.AddComponent<HorizontalLayoutGroup>();
-            hlg.childForceExpandHeight = true;
-            hlg.childForceExpandWidth = false;
-            hlg.spacing = 3f;
-            hlg.padding = new RectOffset(0, 0, 0, 0);
-
             var capturedRepo = repo;
+            var btn = CreateRepoRowButton(parent, "RepoRow_" + repo.repoName, capturedRepo.DisplayName, WHITE,
+                new Action(() => { _importedRepoSelected = false; _featuredSelected = false; repoRegistry.SetActive(capturedRepo); _repoDropdownOpen = false; RefreshRepoRows(); RefreshSkinList(); }));
+            BuildRepoButtonContents(btn, capturedRepo);
+        }
 
-            var selBtnComp = UGUIShip.CreateButton(rowGo.transform, capturedRepo.DisplayName, BTN_DARK, WHITE, FS_SM, new Action(() => { _importedRepoSelected = false; _featuredSelected = false; repoRegistry.SetActive(capturedRepo); _repoDropdownOpen = false; RefreshRepoRows(); RefreshSkinList(); }));
-            MakeButtonScrollable(selBtnComp);
-            var selLbl = selBtnComp.transform.Find("Label")?.GetComponent<Text>();
-            if (selLbl != null)
-            {
-                selLbl.alignment = TextAnchor.MiddleLeft;
-                var selLblRt = selLbl.GetComponent<RectTransform>();
-                if (selLblRt != null) selLblRt.offsetMin = new Vector2(14f, selLblRt.offsetMin.y);
-            }
-            selBtnComp.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
-
+        // cover fills the whole button; name + remove/star overlay it along the bottom, over the overlay strip.
+        // repo==null with a fixedCover is the pinned Imported/Featured entries (embedded banner, no controls)
+        private void BuildRepoButtonContents(Button btn, SkinRepo repo, bool showControls = true, Texture2D fixedCover = null)
+        {
+            // cover fills the button, sized to the 532x38 banner aspect (this drives the row height)
             var coverGo = new GameObject("RepoCover");
-            coverGo.transform.SetParent(selBtnComp.transform, false);
+            coverGo.transform.SetParent(btn.transform, false);
             coverGo.transform.SetAsFirstSibling();
             var coverRt = coverGo.AddComponent<RectTransform>();
             coverRt.anchorMin = Vector2.zero;
             coverRt.anchorMax = Vector2.one;
             coverRt.offsetMin = coverRt.offsetMax = Vector2.zero;
             var coverImg = coverGo.AddComponent<RawImage>();
-            coverImg.color = new Color(1f, 1f, 1f, 0f);
             coverImg.raycastTarget = false;
-            _repoCoverImages[capturedRepo.githubUrl] = coverImg;
-            var cachedCoverTex = repoRegistry.GetCover(capturedRepo);
-            if (cachedCoverTex != null) { coverImg.texture = cachedCoverTex; coverImg.color = Color.white; }
-            else repoRegistry.FetchCover(capturedRepo);
-
-            if (repo.isDefault)
+            if (fixedCover != null)
             {
-                var star = UGUIShip.CreateStretchLabel(rowGo.transform, "★", FS_SM, GOLD);
-                var le = star.gameObject.AddComponent<LayoutElement>();
-                le.preferredWidth = BTN_H; le.minWidth = BTN_H; le.flexibleWidth = 0f;
+                coverImg.texture = fixedCover; coverImg.color = Color.white;
             }
             else
             {
-                var removeBtn = UGUIShip.CreateButton(rowGo.transform, "−",
+                coverImg.color = new Color(1f, 1f, 1f, 0f);
+                _repoCoverImages[repo.githubUrl] = coverImg;
+                var cachedCoverTex = repoRegistry.GetCover(repo);
+                if (cachedCoverTex != null) { coverImg.texture = cachedCoverTex; coverImg.color = Color.white; }
+                else repoRegistry.FetchCover(repo);
+            }
+
+            // 99% overlay strip along the bottom, over the cover but behind the shine (sibling right after cover)
+            var overlayTex = LoadTex("BetterFG.assets.ui.cskins.repo_overlay.png", ref _repoOverlayTex);
+            if (overlayTex != null)
+            {
+                var ovGo = new GameObject("RepoOverlay");
+                ovGo.transform.SetParent(btn.transform, false);
+                ovGo.transform.SetSiblingIndex(coverGo.transform.GetSiblingIndex() + 1);
+                var ovRt = ovGo.AddComponent<RectTransform>();
+                ovRt.anchorMin = new Vector2(0f, 0f);
+                ovRt.anchorMax = new Vector2(1f, 0f);
+                ovRt.pivot = new Vector2(0.5f, 0f);
+                ovRt.sizeDelta = new Vector2(0f, RepoStripH);
+                var ovImg = ovGo.AddComponent<RawImage>();
+                ovImg.texture = overlayTex;
+                ovImg.color = new Color(1f, 1f, 1f, 0.99f);
+                ovImg.raycastTarget = false;
+            }
+
+            // name overlays the bottom strip, left aligned, drawn last so it's on top
+            var lbl = btn.transform.Find("Label")?.GetComponent<Text>();
+            if (lbl != null)
+            {
+                lbl.transform.SetAsLastSibling();
+                lbl.alignment = TextAnchor.MiddleLeft;
+                var lblRt = lbl.GetComponent<RectTransform>();
+                lblRt.anchorMin = new Vector2(0f, 0f);
+                lblRt.anchorMax = new Vector2(1f, 0f);
+                lblRt.pivot = new Vector2(0.5f, 0f);
+                lblRt.offsetMin = new Vector2(14f, 0f);
+                lblRt.offsetMax = new Vector2(showControls ? -RepoStripH : 0f, RepoStripH);
+            }
+
+            if (!showControls) return;
+
+            // remove / default-star pinned to the bottom-right
+            if (repo.isDefault)
+            {
+                var star = UGUIShip.CreateStretchLabel(btn.transform, "★", FS_SM, GOLD);
+                var starRt = star.GetComponent<RectTransform>();
+                starRt.anchorMin = new Vector2(1f, 0f);
+                starRt.anchorMax = new Vector2(1f, 0f);
+                starRt.pivot = new Vector2(1f, 0f);
+                starRt.sizeDelta = new Vector2(RepoStripH, RepoStripH);
+                starRt.anchoredPosition = Vector2.zero;
+            }
+            else
+            {
+                var capturedRepo = repo;
+                var removeBtn = UGUIShip.CreateButton(btn.transform, "−",
                     BTN_REMOVE, WHITE, FS_SM, new Action(() => { repoRegistry.RemoveRepo(capturedRepo); RefreshRepoRows(); }));
                 MakeButtonScrollable(removeBtn);
-                var le = removeBtn.gameObject.AddComponent<LayoutElement>();
-                le.preferredWidth = BTN_H; le.minWidth = BTN_H; le.flexibleWidth = 0f;
+                var rmRt = removeBtn.GetComponent<RectTransform>();
+                rmRt.anchorMin = new Vector2(1f, 0f);
+                rmRt.anchorMax = new Vector2(1f, 0f);
+                rmRt.pivot = new Vector2(1f, 0f);
+                rmRt.sizeDelta = new Vector2(RepoStripH, RepoStripH);
+                rmRt.anchoredPosition = Vector2.zero;
             }
         }
 
         // the permanent "Featured Repos" entry inside the dropdown scroll content
         private void BuildFeaturedEntryRow(RectTransform parent)
         {
-            var rowGo = new GameObject("RepoRow_Featured");
-            rowGo.transform.SetParent(parent, false);
-            rowGo.AddComponent<RectTransform>().sizeDelta = new Vector2(0f, BTN_H);
-            rowGo.AddComponent<LayoutElement>().preferredHeight = BTN_H;
-
-            var hlg = rowGo.AddComponent<HorizontalLayoutGroup>();
-            hlg.childForceExpandHeight = true;
-            hlg.childForceExpandWidth = false;
-            hlg.spacing = 3f;
-            hlg.padding = new RectOffset(0, 0, 0, 0);
-
-            var btn = UGUIShip.CreateButton(rowGo.transform, "Featured Repositories", BTN_DARK, GOLD, FS_SM, new Action(() =>
+            var btn = CreateRepoRowButton(parent, "RepoRow_Featured", "Featured Repositories", GOLD, new Action(() =>
             {
                 _featuredSelected = true;
                 _importedRepoSelected = false;
@@ -797,36 +847,14 @@ namespace BetterFG.UI.Tab
                 RefreshRepoRows();
                 RefreshSkinList();
             }));
-            MakeButtonScrollable(btn);
-            var lbl = btn.transform.Find("Label")?.GetComponent<Text>();
-            if (lbl != null)
-            {
-                lbl.alignment = TextAnchor.MiddleLeft;
-                var lblRt = lbl.GetComponent<RectTransform>();
-                if (lblRt != null) lblRt.offsetMin = new Vector2(14f, lblRt.offsetMin.y);
-            }
-            btn.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
-
-            var star = UGUIShip.CreateStretchLabel(rowGo.transform, "★", FS_SM, GOLD);
-            var starLE = star.gameObject.AddComponent<LayoutElement>();
-            starLE.preferredWidth = BTN_H; starLE.minWidth = BTN_H; starLE.flexibleWidth = 0f;
+            BuildRepoButtonContents(btn, null, showControls: false,
+                fixedCover: LoadTex("BetterFG.assets.ui.cskins.featured.png", ref _featuredTex));
         }
 
         // the permanent "Imported Skins" entry inside the dropdown scroll content
         private void BuildImportedEntryRow(RectTransform parent)
         {
-            var impRowGo = new GameObject("RepoRow_Imported");
-            impRowGo.transform.SetParent(parent, false);
-            impRowGo.AddComponent<RectTransform>().sizeDelta = new Vector2(0f, BTN_H);
-            impRowGo.AddComponent<LayoutElement>().preferredHeight = BTN_H;
-
-            var impHlg = impRowGo.AddComponent<HorizontalLayoutGroup>();
-            impHlg.childForceExpandHeight = true;
-            impHlg.childForceExpandWidth = false;
-            impHlg.spacing = 3f;
-            impHlg.padding = new RectOffset(0, 0, 0, 0);
-
-            var impBtn = UGUIShip.CreateButton(impRowGo.transform, "Imported Skins", BTN_DARK, ORANGE, FS_SM, new Action(() =>
+            var btn = CreateRepoRowButton(parent, "RepoRow_Imported", "Imported Skins", ORANGE, new Action(() =>
             {
                 _importedRepoSelected = true;
                 _featuredSelected = false;
@@ -834,19 +862,8 @@ namespace BetterFG.UI.Tab
                 RefreshRepoRows();
                 RefreshSkinList();
             }));
-            MakeButtonScrollable(impBtn);
-            var impLbl = impBtn.transform.Find("Label")?.GetComponent<Text>();
-            if (impLbl != null)
-            {
-                impLbl.alignment = TextAnchor.MiddleLeft;
-                var impLblRt = impLbl.GetComponent<RectTransform>();
-                if (impLblRt != null) impLblRt.offsetMin = new Vector2(14f, impLblRt.offsetMin.y);
-            }
-            impBtn.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
-
-            var lockLbl = UGUIShip.CreateStretchLabel(impRowGo.transform, "★", FS_SM, ORANGE);
-            var lockLE = lockLbl.gameObject.AddComponent<LayoutElement>();
-            lockLE.preferredWidth = BTN_H; lockLE.minWidth = BTN_H; lockLE.flexibleWidth = 0f;
+            BuildRepoButtonContents(btn, null, showControls: false,
+                fixedCover: LoadTex("BetterFG.assets.ui.cskins.imported.png", ref _importedTex));
         }
 
         private void OnAddRepo()

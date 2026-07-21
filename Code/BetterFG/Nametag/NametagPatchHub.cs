@@ -164,22 +164,26 @@ namespace BetterFG.Nametag
             [HarmonyPostfix]
             public static void Postfix(PlayerInfoHUDBase __instance)
             {
-                if (__instance == null) return;
-                try
-                {
-                    RefreshRemoteNametags();
-                    BeanMonitorService.Instance?.StartCoroutine(RefreshSpawnedNametagsDeferred().WrapToIl2Cpp());
-                }
-                catch (System.Exception ex) { Plugin.Log.LogWarning("BFGFont: SpawnPlayerTag: " + ex.Message); }
+                // a spectate switch respawns EVERY row at once, so this fires in a burst. running a
+                // whole-scene RefreshRemoteNametags per tag (each a FindObjectsOfType<NameTagViewModel>
+                // scan) is what froze the game on every switch. collapse the burst into one queued sweep.
+                if (__instance == null || _refreshQueued) return;
+                var host = BeanMonitorService.Instance;
+                if (host == null) { RefreshRemoteNametags(); return; }
+                _refreshQueued = true;
+                host.StartCoroutine(CoalescedRefresh().WrapToIl2Cpp());
             }
         }
 
-        private static IEnumerator RefreshSpawnedNametagsDeferred()
+        private static bool _refreshQueued;
+
+        private static IEnumerator CoalescedRefresh()
         {
-            yield return new WaitForSeconds(0.3f);
+            yield return null; // let the rest of this frame's spawn burst land first
             RefreshRemoteNametags();
-            yield return new WaitForSeconds(0.6f);
+            yield return new WaitForSeconds(0.5f); // second pass catches late-bound VM text
             RefreshRemoteNametags();
+            _refreshQueued = false;
         }
 
         // the game just set fame/famepass (gold) visuals on this nametag — i.e. it assigned the gold

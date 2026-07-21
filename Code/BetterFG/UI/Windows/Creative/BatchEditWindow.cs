@@ -81,10 +81,11 @@ namespace BetterFG.UI.Windows.Creative
         // baked into committed undo entries — each session only applies (_offsets - _committedOffsets)
         // against its fresh snapshot baseline, otherwise every new hold would re-apply the whole total
         // on top of already-scaled objects and compound.
+        private const float OFFSET_LIMIT = 1000f; // typed offsets, way past anything the game will take
         private readonly float[] _offsets = { 0f, 0f, 0f };
         private readonly float[] _committedOffsets = { 0f, 0f, 0f };
         private ScaleMode _scaleMode = ScaleMode.Individual;
-        private readonly Text[] _valLabels = new Text[3];
+        private readonly InputField[] _valFields = new InputField[3];
         private Text _modeLabel;
         private readonly UGUIShip.HoldButtonState[] _scaleHold = new UGUIShip.HoldButtonState[6]; // -/+ per axis
         // one undo entry per hold session, not one per nudge tick — opened on the first nudge since
@@ -108,7 +109,8 @@ namespace BetterFG.UI.Windows.Creative
 
         public void Close()
         {
-            CommitColourEntry(); // don't lose a pending recolour on close
+            CommitPending(); // don't lose a pending recolour/scale on close
+            BatchScale.BakeOwnerScale(); // hand the editor's multiselect owner back unscaled
             if (Instance == this) Instance = null;
             AnyOpen = false;
             // commit the selection ourselves a frame after close (AnyOpen is false by then, so our own
@@ -137,12 +139,7 @@ namespace BetterFG.UI.Windows.Creative
             Cursor.visible = true;
 
             float dt = Time.unscaledDeltaTime;
-            for (int i = 0; i < _scaleHold.Length; i++)
-            {
-                int a = i / 2;
-                int dir = i % 2 == 0 ? -1 : +1;
-                _scaleHold[i]?.Tick(dt, () => NudgeVal(a, dir));
-            }
+            foreach (var h in _scaleHold) h?.Tick(dt);
 
             if (_subtab == 1) UpdateScaleRowsDim(); // pivot can appear/vanish live in "from selected"
 
@@ -342,25 +339,26 @@ namespace BetterFG.UI.Windows.Creative
             var rows = rowsRt;
 
             // one row per axis:  X   [-] 0.00 [+]   — offset always starts at 0 (no change); +/- add
-            // or subtract directly onto the live scale, so it shrinks as easily as it grows.
+            // or subtract directly onto the live scale, so it shrinks as easily as it grows. the value
+            // is a typable field, for the jump the step buttons would take all day to reach.
             string[] axis = { "X", "Y", "Z" };
+            float step = CreativeIncrements.Enabled ? CreativeIncrements.Step : 0.25f;
+            float repeat = CreativeIncrements.Enabled ? CreativeIncrements.Speed : 0.05f;
+            var holds = new UGUIShip.HoldButtonState[2];
             for (int i = 0; i < 3; i++)
             {
                 int a = i;
-                float rx = PAD;
-                MakeLabel(rows, new Rect(rx, y, 16f, 20f), axis[i], FS_SM, WHITE);
-                rx += 20f;
-                UGUIShip.CreateHoldButton(rows, new Rect(rx, y, 26f, 20f), "-", BTN_STEP, WHITE, FS_BODY,
-                    new Action(() => NudgeVal(a, -1)), out _scaleHold[a * 2]);
-                _scaleHold[a * 2].RepeatInterval = CreativeIncrements.Enabled ? CreativeIncrements.Speed : 0.05f;
-                _scaleHold[a * 2].OnRelease = CommitScaleEntry;
-                rx += 30f;
-                _valLabels[a] = MakeLabel(rows, new Rect(rx, y, w - 20f - 30f * 2f, 20f), ValText(a), FS_SM, WHITE, TextAnchor.MiddleCenter);
-                rx += w - 20f - 30f * 2f;
-                UGUIShip.CreateHoldButton(rows, new Rect(rx, y, 26f, 20f), "+", BTN_STEP, WHITE, FS_BODY,
-                    new Action(() => NudgeVal(a, +1)), out _scaleHold[a * 2 + 1]);
-                _scaleHold[a * 2 + 1].RepeatInterval = CreativeIncrements.Enabled ? CreativeIncrements.Speed : 0.05f;
-                _scaleHold[a * 2 + 1].OnRelease = CommitScaleEntry;
+                MakeLabel(rows, new Rect(PAD, y, 16f, 20f), axis[i], FS_SM, WHITE);
+                _valFields[a] = UGUIShip.CreateIncrement(rows, new Rect(PAD + 20f, y, w - 20f, 20f),
+                    -OFFSET_LIMIT, OFFSET_LIMIT, () => _offsets[a], v => _offsets[a] = v, step,
+                    isFloat: true, wrap: false, fontSize: FS_SM, fmt: OffsetText,
+                    onChange: _ => ApplyScale(), holds: holds);
+                for (int h = 0; h < 2; h++)
+                {
+                    _scaleHold[a * 2 + h] = holds[h];
+                    holds[h].RepeatInterval = repeat;
+                    holds[h].OnRelease = CommitScaleEntry;
+                }
                 y += 24f;
             }
             UpdateScaleRowsDim();
@@ -377,7 +375,7 @@ namespace BetterFG.UI.Windows.Creative
                 new Action(() => CycleMode(+1)));
             y += 26f;
 
-            MakeLabel(root, new Rect(PAD, y, w, 16f), "tap −/+ to nudge once, hold to shrink/grow continuously", FS_SM, HINT_COL);
+            MakeLabel(root, new Rect(PAD, y, w, 16f), "tap −/+ to nudge, hold to run, or just type a value", FS_SM, HINT_COL);
             y += 16f;
 
             UGUIShip.CreateLinkText(root, new Rect(PAD, y, w, 16f), "change nudge amount/repeat speed →",
@@ -414,16 +412,18 @@ namespace BetterFG.UI.Windows.Creative
             _scaleRowsGroup.blocksRaycasts = ready;
         }
 
-        // resets the offset displays AND the committed baseline back to 0 — only called on undo/redo
-        // (the running total no longer matches whatever history just changed). NOT called on commit:
-        // the number persists across holds to show total scaling so far.
+        // resets the offset displays AND the committed baseline back to 0 — called on undo/redo (the
+        // running total no longer matches whatever history just changed) and on a mode switch (the
+        // total got baked in, so it's the new baseline). NOT called on commit: the number persists
+        // across holds to show total scaling so far.
         private void ResetOffsets()
         {
             for (int i = 0; i < 3; i++)
             {
                 _offsets[i] = 0f;
                 _committedOffsets[i] = 0f;
-                if (_valLabels[i] != null) _valLabels[i].text = ValText(i);
+                // null on every subtab but Scale, and undo/redo can fire from any of them
+                if (_valFields[i] != null) UGUIShip.SetInputText(_valFields[i], OffsetText(0f), false);
             }
         }
 
@@ -466,6 +466,16 @@ namespace BetterFG.UI.Windows.Creative
                 new Action(() => Status(BatchCollision.SetCollisionEnabled(true), "collidable")));
             UGUIShip.CreateButton(root, new Rect(PAD + half + 6f, y, half, 28f), "OFF", BTN_STEP, WHITE, FS_BODY,
                 new Action(() => Status(BatchCollision.SetCollisionEnabled(false), "non-collidable")));
+            y += 32f;
+
+            // only stickers have an unlit mode, so this row stays off the tab entirely for anything else
+            if (!BatchMaterial.AnySticker()) return;
+            MakeLabel(root, new Rect(PAD, y, w, 16f), "sticker lighting:", FS_SM, HINT_COL);
+            y += 22f;
+            UGUIShip.CreateButton(root, new Rect(PAD, y, half, 28f), "LIT", BTN_APPLY, WHITE, FS_BODY,
+                new Action(() => Status(BatchMaterial.SetLighting(true), "lit")));
+            UGUIShip.CreateButton(root, new Rect(PAD + half + 6f, y, half, 28f), "UNLIT", BTN_STEP, WHITE, FS_BODY,
+                new Action(() => Status(BatchMaterial.SetLighting(false), "unlit")));
         }
 
         // ── registered extra subtab ──────────────────────────────────────────
@@ -551,8 +561,14 @@ namespace BetterFG.UI.Windows.Creative
             RebuildContent();
         }
 
+        // switching modes has to settle the current one first: individual writes into the scale params
+        // while the group modes ride the owner's multiplier, so carrying either one across the switch
+        // double-applies it. commit, bake, and start the new mode from a clean 0.
         private void CycleMode(int d)
         {
+            CommitScaleEntry();
+            BatchScale.BakeOwnerScale();
+            ResetOffsets();
             _scaleMode = (ScaleMode)(((int)_scaleMode + d + 4) % 4);
             RebuildContent();
         }
@@ -568,17 +584,6 @@ namespace BetterFG.UI.Windows.Creative
         {
             RecolourMode.SetColour => "set to colour", RecolourMode.Modify => "modify", _ => "?"
         };
-
-        // step size defaults to 0.25, or the creative increments step when that override is on, so
-        // scale nudges match the editor's own params. adds/subtracts straight onto the live scale and
-        // applies immediately — no separate Apply press.
-        private void NudgeVal(int a, int dir)
-        {
-            float step = CreativeIncrements.Enabled ? CreativeIncrements.Step : 0.25f;
-            _offsets[a] += dir * step;
-            if (_valLabels[a] != null) _valLabels[a].text = ValText(a);
-            ApplyScale();
-        }
 
         // flush any pending live edit (scale hold / colour preview) into the undo stack so undo/redo
         // act on a settled history, not a half-open session.
@@ -615,7 +620,7 @@ namespace BetterFG.UI.Windows.Creative
             ScaleMode.FromOrigin => "from 0,0,0", ScaleMode.Individual => "individual", ScaleMode.FromCenter => "from center", ScaleMode.FromSelected => "from selected", _ => "?"
         };
 
-        private string ValText(int a) => (_offsets[a] > 0f ? "+" : "") + _offsets[a].ToString("0.##");
+        private static string OffsetText(float v) => (v > 0f ? "+" : "") + v.ToString("0.##");
 
         private void Status(int n, string verb)
         {

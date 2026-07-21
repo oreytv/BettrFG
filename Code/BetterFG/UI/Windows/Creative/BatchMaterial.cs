@@ -11,6 +11,40 @@ namespace BetterFG.UI.Windows.Creative
         public static int SetSlime() => Apply(slime: true);
         public static int SetNone() => Apply(slime: false);
 
+        // does the selection contain anything with an unlit param, i.e. a sticker? gates the lighting row.
+        public static bool AnySticker()
+        {
+            var sel = LevelEditorMultiSelectionHandler.Selection();
+            if (sel == null) return false;
+            foreach (var obj in sel)
+                if (obj != null && BatchTargets.GetUnlitParam(obj) != null) return true;
+            return false;
+        }
+
+        // stickers light like any other surface by default; unlit makes them ignore scene lighting and
+        // render flat, which is what you want for signage/text. "lit" here is just the inverse of unlit.
+        public static int SetLighting(bool lit)
+        {
+            var sel = LevelEditorMultiSelectionHandler.Selection();
+            if (sel == null) { Plugin.Log.LogWarning("BatchMaterial: no selection"); return 0; }
+
+            var entry = BatchEditHistory.Begin(lit ? "lighting on" : "lighting off");
+            int touched = 0, skipped = 0;
+            foreach (var obj in sel)
+            {
+                if (obj == null) continue;
+                var unlit = BatchTargets.GetUnlitParam(obj);
+                if (unlit == null) { skipped++; continue; }
+
+                entry.Snaps.Add(new BatchEditHistory.ObjectSnap { Obj = obj, Unlit = unlit._unlitMode });
+                BatchTargets.ApplyUnlit(unlit, !lit);
+                touched++;
+            }
+            BatchEditHistory.Push(entry);
+            Plugin.Log.LogInfo($"{touched} sticker(s) now {(lit ? "lit" : "unlit")}" + (skipped > 0 ? $", left {skipped} alone (not decals)" : ""));
+            return touched;
+        }
+
         private static int Apply(bool slime)
         {
             var sel = LevelEditorMultiSelectionHandler.Selection();

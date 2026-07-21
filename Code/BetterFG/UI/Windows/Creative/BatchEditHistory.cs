@@ -25,6 +25,7 @@ namespace BetterFG.UI.Windows.Creative
             public int? SurfaceIndex;  // surface/material index
             public int? VisibilityParam;   // visibility option index
             public bool? CollisionEnabled; // collision on/off
+            public bool? Unlit;            // sticker unlit mode
         }
 
         public sealed class BatchEntry
@@ -91,7 +92,7 @@ namespace BetterFG.UI.Windows.Creative
                 if (s.Position.HasValue) { inv.Position = o.Position; o.Position = s.Position.Value; }
 
                 if (s.Colour.HasValue || s.SurfaceIndex.HasValue
-                    || s.VisibilityParam.HasValue || s.CollisionEnabled.HasValue)
+                    || s.VisibilityParam.HasValue || s.CollisionEnabled.HasValue || s.Unlit.HasValue)
                 {
                     BatchTargets.SnapCurrent(o, s, inv); // read current into inv for the fields s carries
                     BatchTargets.Restore(o, s);

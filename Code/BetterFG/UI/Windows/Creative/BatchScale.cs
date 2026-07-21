@@ -57,7 +57,7 @@ namespace BetterFG.UI.Windows.Creative
         // multi-select is active — scaling that owner's transform directly is exactly what works from
         // UnityExplorer. so: no create, no reparent, no disown, no per-object restore. just set the
         // owner's localScale to 1+offset (full running total — the owner keeps its scale between holds,
-        // the game bakes it into the objects itself when the selection ends). FromCenter additionally
+        // and BakeOwnerScale folds it into the objects when we're done with it). FromCenter additionally
         // moves the owner to the centroid once per session, compensating children's world positions so
         // nothing budges.
         private static int ApplyViaOwner(BatchEditHistory.BatchEntry entry,
@@ -130,6 +130,44 @@ namespace BetterFG.UI.Windows.Creative
         {
             var owner = LevelEditorManager.Instance?.GetMultiselectHandler()?._multiselectGlobalParent;
             if (owner != null) owner.transform.localScale = Vector3.one;
+        }
+
+        // The owner is the editor's, not ours, and it survives the window — leave it sitting at 2x and
+        // everything you select next comes out wrong, plus the objects' scale params still read their old
+        // value while they LOOK scaled. So bake before we let go: hold every object's world transform,
+        // put the owner back to identity, write the multiplied scale into the objects' own params, drop
+        // them back where they were. Nothing moves on screen and the owner is neutral again.
+        public static void BakeOwnerScale()
+        {
+            var owner = LevelEditorManager.Instance?.GetMultiselectHandler()?._multiselectGlobalParent;
+            if (owner == null) return;
+            var ot = owner.transform;
+            Vector3 factor = ot.localScale;
+            if (factor == Vector3.one && ot.rotation == Quaternion.identity) return;
+
+            var kids = new System.Collections.Generic.List<(Transform t, Vector3 pos, Quaternion rot, LevelEditorScaleParameter sp, Vector3 scale)>();
+            var sel = LevelEditorMultiSelectionHandler.Selection();
+            if (sel != null)
+            {
+                foreach (var obj in sel)
+                {
+                    if (obj == null) continue;
+                    var t = obj.transform;
+                    var sp = obj._levelEditorScaleParameter;
+                    kids.Add((t, t.position, t.rotation, sp, Vector3.Scale(sp != null ? sp.CurrentScale : t.localScale, factor)));
+                }
+            }
+
+            ot.localScale = Vector3.one;
+            ot.rotation = Quaternion.identity;
+            foreach (var (t, pos, rot, sp, scale) in kids)
+            {
+                if (sp != null) sp.SetScale(scale, true);
+                else t.localScale = scale; // unscalable object, keep the look for the session at least
+                t.SetPositionAndRotation(pos, rot);
+            }
+
+            Plugin.Log.LogDebug($"baked {factor} off the multiselect owner into {kids.Count} objects, owner's back to 1");
         }
 
         // returns the entry's existing snapshot for this object (its session-original), or creates one

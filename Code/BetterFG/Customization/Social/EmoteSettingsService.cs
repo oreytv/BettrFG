@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace BetterFG.Customization.Social
 {
-    // persists EmoteEntry list to Settings/emotes.txt.
+    // persists EmoteEntry list to %APPDATA%\BettrFG\Settings\emotes.txt.
     // format: id|bundlePath|clipName|slot|enabled|imagePath|soundPath
     public static class EmoteSettingsService
     {
@@ -15,9 +15,19 @@ namespace BetterFG.Customization.Social
 
         static EmoteSettingsService()
         {
-            string dll = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
-            Dir = Path.Combine(dll, "Settings");
+            string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            Dir = Path.Combine(appData, "BettrFG", "Settings");
             FilePath = Path.Combine(Dir, "emotes.txt");
+
+            string old = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "", "Settings", "emotes.txt");
+            if (!File.Exists(old)) return;
+            try
+            {
+                Directory.CreateDirectory(Dir);
+                if (!File.Exists(FilePath)) File.Copy(old, FilePath);
+                if (File.Exists(FilePath)) { File.Delete(old); Plugin.Log.LogInfo("moved emotes.txt into appdata"); }
+            }
+            catch (Exception ex) { Plugin.Log.LogWarning($"emotes.txt didn't migrate, left it where it was: {ex.Message}"); }
         }
 
         public static List<EmoteEntry> Load()

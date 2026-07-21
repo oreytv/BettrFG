@@ -115,6 +115,14 @@ namespace BetterFG.UI
 
         public RectTransform Root { get; private set; }
 
+        // the ContentArea GameObject (everything under the title). disabled while the tab is closed so
+        // uGUI stops laying out / repainting it off-screen for nothing; the title peek stays active
+        private GameObject _contentArea;
+        public void SetContentActive(bool active)
+        {
+            if (_contentArea != null && _contentArea.activeSelf != active) _contentArea.SetActive(active);
+        }
+
         private bool _isOpen = false;
         public bool IsOpen
         {
@@ -227,6 +235,10 @@ namespace BetterFG.UI
             contentRt.offsetMax = new Vector2(0f, -UIScale.TITLE_H);
 
             BuildContent(contentRt);
+
+            // tabs start closed/peeked — park the content inactive so it isn't repainted off-screen
+            _contentArea = contentGo;
+            if (!_isOpen) contentGo.SetActive(false);
         }
 
         protected virtual void BuildBackground(RectTransform root) { }

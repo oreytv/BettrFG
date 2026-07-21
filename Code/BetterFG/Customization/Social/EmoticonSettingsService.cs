@@ -7,7 +7,7 @@ using UnityEngine;
 namespace BetterFG.Customization.Social
 {
     /// <summary>
-    /// Persists EmoticonEntry list to Settings/emoticons.txt next to the DLL.
+    /// Persists EmoticonEntry list to %APPDATA%\BettrFG\Settings\emoticons.txt.
     /// Format: one entry per line, pipe-separated: id|itemId|slot|enabled|imagePath|sound0|sound1|sound2
     /// (old files had a single sound at index 5 — that still loads into sound slot 0)
     /// </summary>
@@ -18,9 +18,19 @@ namespace BetterFG.Customization.Social
 
         static EmoticonSettingsService()
         {
-            string dll = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
-            Dir = Path.Combine(dll, "Settings");
+            string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            Dir = Path.Combine(appData, "BettrFG", "Settings");
             FilePath = Path.Combine(Dir, "emoticons.txt");
+
+            string old = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "", "Settings", "emoticons.txt");
+            if (!File.Exists(old)) return;
+            try
+            {
+                Directory.CreateDirectory(Dir);
+                if (!File.Exists(FilePath)) File.Copy(old, FilePath);
+                if (File.Exists(FilePath)) { File.Delete(old); Plugin.Log.LogInfo("moved emoticons.txt into appdata"); }
+            }
+            catch (Exception ex) { Plugin.Log.LogWarning($"emoticons.txt didn't migrate, left it where it was: {ex.Message}"); }
         }
 
         public static List<EmoticonEntry> Load()

@@ -412,18 +412,19 @@ namespace BetterFG.UI
         /// </summary>
         // hold-to-repeat button state: fires onFire once on press, then after HoldDelay seconds of
         // holding, repeats every RepeatInterval seconds until released. caller ticks
-        // Tick(Time.unscaledDeltaTime, ...) from its own ManagedUpdate/Update — no new
-        // MonoBehaviour/IL2Cpp registration needed.
+        // Tick(Time.unscaledDeltaTime) from its own ManagedUpdate/Update — no new MonoBehaviour/IL2Cpp
+        // registration needed.
         public sealed class HoldButtonState
         {
             public float HoldDelay = 0.5f;
             public float RepeatInterval = 0.05f;
             public Action OnRelease; // fires once when the hold ends — used to commit one undo entry per hold
+            private Action _fire;
             private bool _held;
             private bool _firedOnce;
             private float _timer;
 
-            public void Tick(float dt, Action onFire)
+            public void Tick(float dt)
             {
                 if (!_held) return;
                 _timer += dt;
@@ -432,7 +433,7 @@ namespace BetterFG.UI
                 {
                     _timer = 0f;
                     _firedOnce = true;
-                    onFire?.Invoke();
+                    _fire?.Invoke();
                 }
             }
 
@@ -446,7 +447,7 @@ namespace BetterFG.UI
 
             public static HoldButtonState Wire(GameObject go, Action onFire)
             {
-                var state = new HoldButtonState();
+                var state = new HoldButtonState { _fire = onFire };
                 var trigger = go.GetComponent<EventTrigger>() ?? go.AddComponent<EventTrigger>();
 
                 var down = new EventTrigger.Entry { eventID = EventTriggerType.PointerDown };
@@ -1147,10 +1148,13 @@ namespace BetterFG.UI
         // value text. onChange fires after set, for the caller to save/refresh. the value sits in a real
         // InputField, so a pad can hold +/- and a keyboard can type the extreme the steps won't reach.
         // returns it so callers can resync if the value changes elsewhere.
+        // pass a 2-long `holds` array to get hold-to-repeat on the −/+ buttons (filled minus-then-plus);
+        // that makes it the caller's job to Tick() them every frame, which is why it's opt-in.
         private static readonly Color IncStepCol = new Color(0.22f, 0.32f, 0.42f, 1f);
         public static InputField CreateIncrement(Transform parent, Rect rect, float min, float max,
             Func<float> get, Action<float> set, float step, bool isFloat = false, bool wrap = true,
-            int fontSize = 13, Func<float, string> fmt = null, Action<float> onChange = null)
+            int fontSize = 13, Func<float, string> fmt = null, Action<float> onChange = null,
+            HoldButtonState[] holds = null)
         {
             var ci = System.Globalization.CultureInfo.InvariantCulture;
             if (fmt == null) fmt = v => isFloat ? v.ToString(ci) : Mathf.RoundToInt(v).ToString(ci);
@@ -1179,24 +1183,26 @@ namespace BetterFG.UI
                 else SetInputText(field, fmt(get()), false);
             }));
 
-            void Step(float x, float delta, string glyph)
+            void Step(float x, float delta, string glyph, int slot)
             {
-                CreateButton(parent, new Rect(x, rect.y, stepW, rect.height), glyph,
-                    IncStepCol, Color.white, fontSize, new Action(() =>
-                    {
-                        // decimal, and anchored at 0 instead of min. float stepping drifts (0.1+0.05
-                        // = 0.15000001) and the field renders every digit of it; anchoring the grid
-                        // at a min of 0.01 walks you along 0.06/0.11/0.16 instead of round numbers
-                        decimal grid = (decimal)step;
-                        float nv = (float)(Math.Round(((decimal)get() + (decimal)delta) / grid) * grid);
-                        float span = max - min + (isFloat ? 0f : 1f);
-                        if (wrap && span > 0f) nv = min + Mathf.Repeat(nv - min, span);
-                        Commit(nv);
-                    }));
+                var fire = new Action(() =>
+                {
+                    // decimal, and anchored at 0 instead of min. float stepping drifts (0.1+0.05
+                    // = 0.15000001) and the field renders every digit of it; anchoring the grid
+                    // at a min of 0.01 walks you along 0.06/0.11/0.16 instead of round numbers
+                    decimal grid = (decimal)step;
+                    float nv = (float)(Math.Round(((decimal)get() + (decimal)delta) / grid) * grid);
+                    float span = max - min + (isFloat ? 0f : 1f);
+                    if (wrap && span > 0f) nv = min + Mathf.Repeat(nv - min, span);
+                    Commit(nv);
+                });
+                var r = new Rect(x, rect.y, stepW, rect.height);
+                if (holds == null) CreateButton(parent, r, glyph, IncStepCol, Color.white, fontSize, fire);
+                else CreateHoldButton(parent, r, glyph, IncStepCol, Color.white, fontSize, fire, out holds[slot]);
             }
 
-            Step(rect.x, -step, "−");                    // minus sign, matches existing rows
-            Step(rect.x + stepW + valW, step, "+");
+            Step(rect.x, -step, "−", 0);                 // minus sign, matches existing rows
+            Step(rect.x + stepW + valW, step, "+", 1);
             return field;
         }
 

@@ -153,6 +153,7 @@ namespace BetterFG
             ClassInjector.RegisterTypeInIl2Cpp<CustomSkinTextureTab>();
             ClassInjector.RegisterTypeInIl2Cpp<AllCosmeticsTab>();
             ClassInjector.RegisterTypeInIl2Cpp<CreativeTab>();
+            ClassInjector.RegisterTypeInIl2Cpp<CustomCreativeTextureTab>();
             ClassInjector.RegisterTypeInIl2Cpp<PersonalBestTab>();
 
             // windows
@@ -218,6 +219,7 @@ namespace BetterFG
             ClassInjector.RegisterTypeInIl2Cpp<LivelyFallGuysTweak>();
             ClassInjector.RegisterTypeInIl2Cpp<LevelDescriptionOnPauseTweak>();
             ClassInjector.RegisterTypeInIl2Cpp<CreativeTypeValueTweak>();
+            ClassInjector.RegisterTypeInIl2Cpp<BetterStickerSelectionTweak>();
             ClassInjector.RegisterTypeInIl2Cpp<NotifyRoundStartTweak>();
             //ClassInjector.RegisterTypeInIl2Cpp<BetterFG.Features.WinStreakDebug.WinStreakDebugService>();
         }
