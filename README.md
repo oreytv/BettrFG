@@ -9,29 +9,28 @@
 </p>
 
 
-# BettrFG
+# Info
 
-This repo holds the installer and source for BettrFG, the Fall Guys mod that aims to make the Fall Guys experience more fun using custom QoL features and UGC customization
-
-## Source code
-
-> [!WARNING]
-> The **Profiles** feature is intentionally left out of this repository. Its source files are excluded, and the code you get here does not build with it. Don't ask for it or try to add it back.
->
-> I also have not provided the code required to patch the game's anti-cheat and platform spoofing. I know it's easy to obtain. But I'm trying my best lol
+This repository holds the installer and source code for BettrFG, the Fall Guys mod that aims to make the Fall Guys experience more fun using custom QoL features and UGC customization
 
 ### Discord server:
 http://dsc.gg/bettrfg
 
 # Installation
 
-<img width="789" height="556" alt="image" src="https://github.com/user-attachments/assets/cc8657a0-484a-464c-acf2-cd93a29bbe94" />
-
 #### Step 1: Get the installer from [here](https://github.com/oreytv/BettrFG/releases/tag/installer)
 #### Step 2: Open the installer's executable file
 #### Step 3: Select the installation location of your choice for the mod
 #### Step 4: Choose whether to install latest, specific version, or uninstall etc.
 
+<img width="789" height="556" alt="image" src="https://github.com/user-attachments/assets/cc8657a0-484a-464c-acf2-cd93a29bbe94" />
+
+# Source code
+
+> [!WARNING]
+> The **Profiles** feature is intentionally left out of this repository. Its source files are excluded, and the code you get here does not build with it.
+>
+> I also have not provided the code required to patch the game's anti-cheat and platform spoofing. I know it's easy to obtain. But I'm trying my best lol
 
 # Features
 - Custom UGC skins and accessories
@@ -47,13 +46,10 @@ http://dsc.gg/bettrfg
 - [Download base rig.blend](https://github.com/oreytv/BettrFG/raw/refs/heads/main/assets/base%20rig.blend)
 - Unity https://unity.com/releases/editor/whats-new/2021.3.16f1
 
-# Contribution
+# Credits
 
-Programming, most implementations:
-- oreyre9000 (oreytv)
-
-Programming help, code snippets, general ideas and features:
-- [Floyzi](https://x.com/floyzi102)
+- oreyre9000 (oreytv) --- Programming, implementation
+- [Floyzi](https://x.com/floyzi102) --- Programming contributor (Contributed to a few tweaks and has helped share methods)
 
   
 UI:
