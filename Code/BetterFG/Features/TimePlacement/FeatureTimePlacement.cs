@@ -211,6 +211,7 @@ namespace BetterFG.Features.TimePlacement
             _perRoundSoloOverride = null;
             _soloToggleprompt?.Destroy();
             _soloToggleprompt = null;
+            BeanPortraits.Clear();
             _spawnGen++;   // retire any poll coroutines from the previous round
         }
 
@@ -349,7 +350,10 @@ namespace BetterFG.Features.TimePlacement
             // qualification-status roster — only paints once QualStatusActive() confirms a solo
             // round with the toggle on, so it no-ops everywhere else.
             if (BetterFGUIMan.Instance != null)
+            {
                 BetterFGUIMan.Instance.StartCoroutine(QualStatusPollCoroutine().WrapToIl2Cpp());
+                BetterFGUIMan.Instance.StartCoroutine(BeanPortraits.CaptureCoroutine().WrapToIl2Cpp());
+            }
 
             // only spawn the squad/per-player toggle when we're actually in a squad round — solo
             // (SquadSize <= 1) would collide with the Respawn prompt on the same controller button.
@@ -546,6 +550,8 @@ namespace BetterFG.Features.TimePlacement
         const float PosX = 6f;        // placement (1st, 2nd...)
         const float PtsX = 50f;       // points column, right after placement
         const float NamesX = 120f;    // names start after points
+        const float BeanH = 30f;
+        static float BeanW => BeanH * LeaderboardMugshotScene.Width / LeaderboardMugshotScene.Height;
 
         // build three fixed-position labels per row: placement, points, names (one object, can be 2
         // lines). each is anchored to the row's LEFT-CENTER so anchoredPosition.x is identical on
@@ -589,6 +595,17 @@ namespace BetterFG.Features.TimePlacement
                 bgGo.transform.SetSiblingIndex(0);   // behind the labels we add next
                 bgGo.SetActive(true);
             }
+
+            var beanGo = new GameObject("BFG_Bean");
+            beanGo.transform.SetParent(entryGo.transform, false);
+            var beanRt = beanGo.AddComponent<RectTransform>();
+            beanRt.anchorMin = new Vector2(0f, 0.5f);
+            beanRt.anchorMax = new Vector2(0f, 0.5f);
+            beanRt.pivot = new Vector2(0f, 0.5f);
+            beanRt.sizeDelta = new Vector2(BeanW, BeanH);
+            var beanImg = beanGo.AddComponent<RawImage>();
+            beanImg.raycastTarget = false;
+            beanGo.SetActive(false);
 
             MakeLabel(entryGo.transform, src, "BFG_Pos", PosX, TextAlignmentOptions.Left);
             MakeLabel(entryGo.transform, src, "BFG_Pts", PtsX, TextAlignmentOptions.Left);
@@ -736,7 +753,7 @@ namespace BetterFG.Features.TimePlacement
                 $"<b><color=#FFFF00>{place}{suffix}</color></b>",
                 name,
                 $"<size=120%>{time}</size>",
-                80f);
+                80f, fkey);
             Plugin.Log.LogInfo($"TimePlacement: {place}{suffix} -> {name} {time} (id {remotePlayerId})");
         }
 
@@ -744,10 +761,14 @@ namespace BetterFG.Features.TimePlacement
             place == 1 ? "st" : place == 2 ? "nd" : place == 3 ? "rd" : "th";
 
         // set the three columns of a row across every panel, activating that row. namesXOffset
-        // nudges the name column right (race rounds use it to clear the wide time string).
-        static void SetRow(int index, string pos, string names, string pts, float namesXOffset = 0f)
+        // nudges the name column right (race rounds use it to clear the wide time string). playerKey
+        // is only passed by the one-player-per-row modes, squad rows leave it null
+        static void SetRow(int index, string pos, string names, string pts, float namesXOffset = 0f, string playerKey = null)
         {
             if (index < 0 || index >= _entryPool.Count) return;
+            var portrait = BeanPortraits.Get(playerKey);
+            float beanX = NamesX + namesXOffset;
+            float nameX = beanX + (portrait != null ? BeanW + 4f : 0f);
             foreach (var entryGo in _entryPool[index])
             {
                 if (entryGo == null) continue;
@@ -756,8 +777,15 @@ namespace BetterFG.Features.TimePlacement
                 var namesLabel = FindLabel(entryGo, "BFG_Names");
                 Apply(namesLabel, names);
                 if (namesLabel != null)
-                    namesLabel.rectTransform.anchoredPosition = new Vector2(NamesX + namesXOffset, 0f);
+                    namesLabel.rectTransform.anchoredPosition = new Vector2(nameX, 0f);
                 Apply(FindLabel(entryGo, "BFG_Pts"), pts);
+
+                var bean = entryGo.transform.Find("BFG_Bean");
+                if (bean == null) continue;
+                bean.gameObject.SetActive(portrait != null);
+                if (portrait == null) continue;
+                bean.GetComponent<RawImage>().texture = portrait;
+                bean.GetComponent<RectTransform>().anchoredPosition = new Vector2(beanX, 0f);
             }
         }
 
@@ -1493,7 +1521,7 @@ namespace BetterFG.Features.TimePlacement
                 // solo scoring (points, 1 player per row) — bigger name, this path has one name per
                 // row so it has room to breathe (squad rows stay 70% since they pack 2-4 names).
                 // nudge the name column ~20px right in points rounds.
-                SetRow(row, posText, $"<size=100%>{name}</size>", ptsText, 20f);
+                SetRow(row, posText, $"<size=100%>{name}</size>", ptsText, 20f, p != null ? p.playerKey : null);
                 row++;
             }
             _lastSoloSig = _soloSig;
@@ -1526,6 +1554,14 @@ namespace BetterFG.Features.TimePlacement
                 }
                 yield return null;
             }
+        }
+
+        // portraits land a second in, by which point the board may already be painted on an unchanged
+        // signature, so drop it and let the next tick repaint
+        public static void OnPortraitsReady()
+        {
+            _lastSoloSig = 0;
+            _soloDirty = true;
         }
 
         // called from the SoloScoreManager patches when a score changes — just mark dirty. the poll
@@ -1599,8 +1635,8 @@ namespace BetterFG.Features.TimePlacement
                 ? squadKeys
                 : (string.IsNullOrEmpty(myKey) ? null : new HashSet<string> { myKey });
 
-            var quals = new List<(string name, float time, bool timed, uint id, bool mine)>();
-            var outs = new List<(string name, uint id, bool mine)>();
+            var quals = new List<(string name, float time, bool timed, uint id, bool mine, string key)>();
+            var outs = new List<(string name, uint id, bool mine, string key)>();
             for (int i = 0; i < players.Count; i++)
             {
                 var p = players[i];
@@ -1610,10 +1646,10 @@ namespace BetterFG.Features.TimePlacement
                 if (p.completedLevel)
                 {
                     bool timed = _qualTimes.TryGetValue(p.playerKey, out float t);
-                    quals.Add((ResolveDisplayName(p.playerKey, highlight), t, timed, p.remotePlayerID, mine));
+                    quals.Add((ResolveDisplayName(p.playerKey, highlight), t, timed, p.remotePlayerID, mine, p.playerKey));
                 }
                 else if (p.fgcc == null && ShowEliminatedNow())
-                    outs.Add((ResolveDisplayName(p.playerKey, highlight), p.remotePlayerID, mine));
+                    outs.Add((ResolveDisplayName(p.playerKey, highlight), p.remotePlayerID, mine, p.playerKey));
                 // else still playing — skip
             }
 
@@ -1644,7 +1680,7 @@ namespace BetterFG.Features.TimePlacement
                 SetRow(row,
                     $"<b><color=#FFFF00>{place}{Suffix(place)}</color></b>",
                     nameText,
-                    time, 80f);
+                    time, 80f, e.key);
                 row++;
             }
             for (int i = 0; i < outs.Count && row < MaxRows; i++)
@@ -1653,7 +1689,7 @@ namespace BetterFG.Features.TimePlacement
                 SetRow(row,
                     "<b><color=#FF5555>OUT</color></b>",
                     $"<size=85%><color=#FF5555>{outs[i].name}</color></size>",
-                    "", 80f);
+                    "", 80f, outs[i].key);
                 row++;
             }
 
