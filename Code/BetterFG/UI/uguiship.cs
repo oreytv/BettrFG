@@ -38,7 +38,7 @@ namespace BetterFG.UI
 
             var scaler = go.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = BetterFG.Services.UIScaleService.CurrentRef;
+            BetterFG.Services.UIScaleService.Register(canvas);
 
             go.AddComponent<GraphicRaycaster>();
             return canvas;

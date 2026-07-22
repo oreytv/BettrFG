@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -27,11 +28,16 @@ namespace BetterFG.Services
             Apply(on ? Current : 1f);
         }
 
-        // our canvas GameObjects all end in "_Canvas" or are named below. cheap to just match names.
-        private static readonly string[] CanvasNames =
+        // every canvas we create registers here. the old Resources.FindObjectsOfTypeAll<CanvasScaler>()
+        // sweep walked every loaded object in memory (assets and prefabs included) on every view
+        // switch just to rediscover our own handful of canvases — 12-21ms a switch.
+        private static readonly List<Canvas> Ours = new List<Canvas>();
+
+        public static void Register(Canvas canvas)
         {
-            "BetterFG_Canvas", "SideWheelCanvas", "BetterFGNotif_Canvas", "BetterFGUpdate_Canvas"
-        };
+            Ours.Add(canvas);
+            canvas.GetComponent<CanvasScaler>().referenceResolution = CurrentRef;
+        }
 
         public static float Current
         {
@@ -54,16 +60,11 @@ namespace BetterFG.Services
             if (scale < 0.1f) scale = 1f;
             var newRef = BaseRef / scale;
 
-            foreach (var sc in Resources.FindObjectsOfTypeAll<CanvasScaler>())
+            for (int i = Ours.Count - 1; i >= 0; i--)
             {
-                if (sc == null) continue;
-                if (sc.uiScaleMode != CanvasScaler.ScaleMode.ScaleWithScreenSize) continue;
-
-                string n = sc.gameObject.name;
-                bool ours = n.EndsWith("_Canvas") || System.Array.IndexOf(CanvasNames, n) >= 0;
-                if (!ours) continue;
-
-                sc.referenceResolution = newRef;
+                var canvas = Ours[i];
+                if (canvas == null) { Ours.RemoveAt(i); continue; }
+                canvas.GetComponent<CanvasScaler>().referenceResolution = newRef;
             }
         }
 

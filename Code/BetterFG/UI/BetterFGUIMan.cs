@@ -1544,7 +1544,7 @@ namespace BetterFG.UI
 
             var scaler = go.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = BetterFG.Services.UIScaleService.CurrentRef;
+            BetterFG.Services.UIScaleService.Register(canvas);
             scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
             scaler.matchWidthOrHeight = 0.5f;
 
@@ -1573,7 +1573,7 @@ namespace BetterFG.UI
 
             var scaler = go.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = BetterFG.Services.UIScaleService.CurrentRef;
+            BetterFG.Services.UIScaleService.Register(_canvas);
             go.AddComponent<GraphicRaycaster>();
 
             // stack anchored to bottom-left

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using BetterFG.Core;
 using BetterFG.Services;
@@ -223,7 +223,7 @@ namespace BetterFG.UI
 
             var scaler = canvasGo.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = UIScaleService.CurrentRef;
+            UIScaleService.Register(canvas);
             scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
             scaler.matchWidthOrHeight = 0.5f;
             canvasGo.AddComponent<GraphicRaycaster>();
